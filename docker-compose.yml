@@ -1,0 +1,17 @@
+services:
+  shopping-list:
+    build: .
+    container_name: shopping-list
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      # Set a password before exposing this to the internet.
+      APP_PASSWORD: "change-me"
+      # Uncomment when running behind Caddy/nginx/Cloudflare Tunnel:
+      # TRUST_PROXY: "1"
+    volumes:
+      - shopping-data:/data
+
+volumes:
+  shopping-data:

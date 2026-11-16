@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <meta name="theme-color" content="#EEF1EA" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#101613" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Shopping list</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="preload" href="fonts/atkinson-400.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div id="boot" class="boot">Loading your list…</div>
+
+  <!-- Sign in -->
+  <main id="login" class="login" hidden>
+    <form id="loginForm" class="login-card">
+      <img src="icon.svg" alt="" width="56" height="56">
+      <h1>Shopping list</h1>
+      <label for="password">Password</label>
+      <input id="password" type="password" autocomplete="current-password" required>
+      <p id="loginError" class="form-error" role="alert"></p>
+      <button class="btn btn-primary" type="submit">Sign in</button>
+    </form>
+  </main>
+
+  <!-- App -->
+  <div id="app" class="app" hidden>
+    <header class="top">
+      <div class="top-row">
+        <button id="listSwitch" class="list-switch" type="button" aria-haspopup="dialog">
+          <span id="listName">Groceries</span>
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <span id="syncState" class="sync" role="status"></span>
+        <button id="menuBtn" class="icon-btn" type="button" aria-label="List options" aria-haspopup="dialog">
+          <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+        </button>
+      </div>
+      <div id="strip" class="strip" aria-hidden="true"></div>
+      <p id="progressText" class="progress-text"></p>
+    </header>
+
+    <p id="offline" class="banner" hidden></p>
+
+    <main id="main" class="main">
+      <div id="toGet"></div>
+      <div id="empty" class="empty" hidden></div>
+      <section id="cart" class="cart" hidden>
+        <div class="cart-head">
+          <button id="cartToggle" class="cart-toggle" type="button" aria-expanded="true">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span id="cartTitle">In the cart</span>
+          </button>
+          <button id="cartClear" class="link-btn" type="button">Clear</button>
+        </div>
+        <ul id="cartItems" class="rows rows-done"></ul>
+      </section>
+    </main>
+
+    <form id="addForm" class="add-bar" autocomplete="off">
+      <ul id="suggestions" class="suggestions" role="listbox" aria-label="Suggestions" hidden></ul>
+      <div class="add-row">
+        <label for="addInput" class="sr-only">Add an item</label>
+        <input id="addInput" type="text" enterkeyhint="done" maxlength="160"
+               placeholder="Add an item, like “2 avocados”"
+               role="combobox" aria-autocomplete="list" aria-controls="suggestions" aria-expanded="false">
+        <button class="add-btn" type="submit" aria-label="Add item">
+          <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Edit item -->
+  <dialog id="itemSheet" class="sheet" aria-labelledby="itemSheetTitle">
+    <form id="itemForm" method="dialog">
+      <h2 id="itemSheetTitle" class="sheet-title">Edit item</h2>
+      <label class="field">
+        <span>Item</span>
+        <input id="fName" type="text" maxlength="120" required>
+      </label>
+      <div class="field">
+        <label for="fQty">Quantity</label>
+        <div class="stepper">
+          <button type="button" class="step" data-step="-1" aria-label="Less">−</button>
+          <input id="fQty" type="text" maxlength="40" placeholder="1" inputmode="text">
+          <button type="button" class="step" data-step="1" aria-label="More">+</button>
+        </div>
+      </div>
+      <fieldset class="field">
+        <legend>Aisle</legend>
+        <div id="fCats" class="cat-grid"></div>
+      </fieldset>
+      <label class="field">
+        <span>Note</span>
+        <textarea id="fNote" rows="2" maxlength="300" placeholder="Brand, size, “only if on sale”…"></textarea>
+      </label>
+      <label id="fListWrap" class="field" hidden>
+        <span>List</span>
+        <select id="fList"></select>
+      </label>
+      <div class="sheet-actions">
+        <button id="fDelete" type="button" class="btn btn-danger">Delete</button>
+        <span class="spacer"></span>
+        <button type="button" class="btn" data-close>Cancel</button>
+        <button type="submit" class="btn btn-primary" value="save">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Lists -->
+  <dialog id="listsSheet" class="sheet" aria-labelledby="listsTitle">
+    <h2 id="listsTitle" class="sheet-title">Your lists</h2>
+    <ul id="listsList" class="choice-list"></ul>
+    <form id="newListForm" class="inline-form">
+      <label for="newListName" class="sr-only">New list name</label>
+      <input id="newListName" type="text" maxlength="60" placeholder="New list, e.g. Costco">
+      <button class="btn btn-primary" type="submit">Create</button>
+    </form>
+  </dialog>
+
+  <!-- List menu -->
+  <dialog id="menuSheet" class="sheet" aria-labelledby="menuTitle">
+    <h2 id="menuTitle" class="sheet-title">Groceries</h2>
+    <div class="menu">
+      <button type="button" class="menu-item" data-cmd="share">Share or copy this list</button>
+      <button type="button" class="menu-item" data-cmd="wake" id="wakeBtn" hidden>Keep screen on while shopping</button>
+      <button type="button" class="menu-item" data-cmd="uncheck">Put everything back on the list</button>
+      <button type="button" class="menu-item" data-cmd="clearChecked">Clear items in the cart</button>
+      <button type="button" class="menu-item" data-cmd="rename">Rename list</button>
+      <button type="button" class="menu-item danger" data-cmd="clearAll">Remove all items</button>
+      <button type="button" class="menu-item danger" data-cmd="deleteList">Delete list</button>
+      <button type="button" class="menu-item" data-cmd="logout" id="logoutBtn" hidden>Sign out on this device</button>
+    </div>
+  </dialog>
+
+  <!-- Confirm / prompt -->
+  <dialog id="askSheet" class="sheet sheet-small" aria-labelledby="askTitle">
+    <form id="askForm" method="dialog">
+      <h2 id="askTitle" class="sheet-title"></h2>
+      <p id="askBody" class="ask-body"></p>
+      <input id="askInput" type="text" maxlength="60" hidden>
+      <div class="sheet-actions">
+        <span class="spacer"></span>
+        <button type="button" class="btn" data-close>Cancel</button>
+        <button id="askOk" type="submit" class="btn btn-primary" value="ok">OK</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden>
+    <span id="toastText"></span>
+    <button id="toastAction" type="button" hidden>Undo</button>
+  </div>
+</body>
+</html>

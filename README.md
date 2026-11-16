@@ -1,0 +1,92 @@
+# Shopping list
+
+A self-hosted, shared shopping list. One small Node server, no dependencies, data in a single JSON file.
+
+## Features
+
+- Several lists (Groceries, Costco, Pharmacy…), switch from the title
+- Items sort themselves into aisles; correct an aisle once and it's remembered
+- Type naturally: `2 avocados`, `2 lb ground beef`, `milk x2`
+- Paste a whole list (one item per line) to add everything at once
+- Suggestions from what you've bought before, frequent items when the box is empty
+- Checked items move to "In the cart"; clear it, or put everything back to reuse a list
+- Edit quantity, aisle, note, or move an item to another list; undo after deleting
+- Live sync between phones (changes appear instantly on every open device)
+- Works offline in the store: changes are saved on the phone and sync when you reconnect
+- Install to the home screen (needs HTTPS), keep-screen-on mode, share or copy the list
+- Optional password, light and dark mode
+
+## Run it
+
+**Docker (recommended)**
+
+```bash
+# edit APP_PASSWORD in docker-compose.yml first
+docker compose up -d --build
+```
+
+Open `http://SERVER-IP:3000`.
+
+**Plain Node 18+**
+
+```bash
+APP_PASSWORD=yourpassword node server.js
+```
+
+| Variable | Default | What it does |
+|---|---|---|
+| `PORT` | `3000` | Port to listen on |
+| `APP_PASSWORD` | none | Require this password. Changing it signs every device out |
+| `DATA_DIR` | `./data` | Where `db.json` is stored |
+| `TRUST_PROXY` | off | Set to `1` behind Caddy/nginx/Cloudflare so rate limiting and secure cookies use the real client |
+| `COOKIE_SECURE` | off | Set to `1` to always mark the cookie Secure |
+
+## HTTPS (needed for install + offline)
+
+Browsers only allow home-screen install, offline caching and keep-screen-on over HTTPS. With Caddy:
+
+```
+list.yourdomain.com {
+    reverse_proxy 127.0.0.1:3000
+}
+```
+
+Then set `TRUST_PROXY: "1"`. With nginx, also add `proxy_buffering off;` so live sync isn't delayed.
+Serving from a subpath (e.g. `/shopping/`) works if the proxy strips the prefix.
+
+## Oracle Cloud note
+
+Opening port 3000 (or 80/443 for Caddy) needs two things: an ingress rule in the VCN security list, and the instance's own firewall:
+
+```bash
+sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 3000 -j ACCEPT
+sudo netfilter-persistent save
+```
+
+## Backups
+
+Everything lives in `db.json` in the data folder (Docker volume `shopping-data`).
+A copy is saved as `db.json.bak` each time the server starts. Writes are atomic, so a crash can't leave a half-written file.
+
+```bash
+docker cp shopping-list:/data/db.json ./shopping-backup.json
+```
+
+## API
+
+All JSON, cookie-authenticated when a password is set. Every write returns the full state.
+
+```
+GET    /api/state
+GET    /api/events                         Server-sent events (version changes)
+POST   /api/lists                          { name }
+PATCH  /api/lists/:id                      { name }
+DELETE /api/lists/:id
+POST   /api/lists/:id/items                { name, qty?, category?, note? }
+PATCH  /api/lists/:id/items/:itemId        any of { name, qty, category, note, checked }
+DELETE /api/lists/:id/items/:itemId
+POST   /api/lists/:id/clear-checked | uncheck-all | clear-all
+DELETE /api/history/:key                   stop suggesting an item
+```
+
+Handy for n8n or Home Assistant automations (e.g. "add milk" from a voice command).

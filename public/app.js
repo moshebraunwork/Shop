@@ -1,0 +1,1043 @@
+'use strict';
+(() => {
+  /* ============================================================ constants */
+
+  const CATS = [
+    { id: 'produce', label: 'Produce', color: '#3F8F4F' },
+    { id: 'bakery', label: 'Bakery', color: '#C28A2B' },
+    { id: 'dairy', label: 'Dairy & eggs', color: '#3B7DD8' },
+    { id: 'meat', label: 'Meat & fish', color: '#C2413B' },
+    { id: 'frozen', label: 'Frozen', color: '#2AA3B8' },
+    { id: 'pantry', label: 'Pantry', color: '#9A6331' },
+    { id: 'snacks', label: 'Snacks & sweets', color: '#D0518A' },
+    { id: 'drinks', label: 'Drinks', color: '#7A56C9' },
+    { id: 'household', label: 'Household', color: '#5F6B73' },
+    { id: 'personal', label: 'Health & beauty', color: '#B565B5' },
+    { id: 'baby', label: 'Baby', color: '#E08A2C' },
+    { id: 'pets', label: 'Pets', color: '#8A6D4E' },
+    { id: 'other', label: 'Other', color: '#8A8F87' },
+  ];
+  const CAT = Object.fromEntries(CATS.map((c) => [c.id, c]));
+
+  // Comma-separated keywords. A keyword matches the start of a word, so "strawberr" catches strawberries.
+  const KEYWORDS = {
+    produce: 'apple,banana,orange,lemon,lime,grape,strawberr,blueberr,raspberr,blackberr,berries,melon,watermelon,cantaloupe,peach,nectarine,pear,plum,cherr,mango,pineapple,kiwi,avocado,tomato,potato,sweet potato,yam,onion,shallot,garlic,ginger,carrot,celery,cucumber,lettuce,romaine,spinach,kale,cabbage,broccoli,cauliflower,bell pepper,pepper,jalapeno,zucchini,squash,pumpkin,mushroom,corn,cilantro,parsley,basil,dill,mint,scallion,green onion,leek,beet,radish,asparagus,eggplant,salad,arugula,greens,fruit,vegetable,veggie,peas,green beans,sprouts,clementine,grapefruit,pomegranate,herbs',
+    bakery: 'bread,bagel,baguette,bun,roll,croissant,muffin,english muffin,pita,tortilla,wrap,challah,rye,sourdough,cake,donut,doughnut,pastry,pie,naan,brioche,rugelach',
+    dairy: 'milk,cheese,cheddar,mozzarella,parmesan,feta,yogurt,yoghurt,butter,cream,cream cheese,sour cream,half and half,egg,cottage cheese,ricotta,kefir,whipped cream,creamer,margarine,hummus',
+    meat: 'chicken,beef,steak,ground beef,ground turkey,turkey,pork,bacon,ham,sausage,salami,hot dog,lamb,veal,brisket,salmon,tuna steak,fish,shrimp,cod,tilapia,catfish,deli,meatball,ribs,schnitzel,pastrami,gefilte',
+    frozen: 'ice cream,ice pop,popsicle,frozen,pizza,fries,french fries,sorbet,waffles,tater tots,latkes,ice',
+    pantry: 'rice,pasta,spaghetti,noodle,flour,sugar,salt,black pepper,oil,olive oil,vinegar,sauce,tomato sauce,tomato paste,soy sauce,ketchup,mustard,mayo,mayonnaise,cereal,cornflakes,oats,oatmeal,beans,lentils,chickpeas,canned,soup,broth,stock,tuna,peanut butter,jam,jelly,honey,syrup,maple syrup,spice,cinnamon,paprika,cumin,baking soda,baking powder,yeast,vanilla,cocoa,breadcrumbs,salsa,matzah,matzo,quinoa,couscous,tahini,icing,sprinkles',
+    snacks: 'chips,crisps,cookie,cracker,pretzel,popcorn,candy,chocolate,gum,granola bar,nuts,almonds,cashews,peanuts,trail mix,dried fruit,raisins,snack,marshmallow,gummies',
+    drinks: 'water,sparkling water,seltzer,soda,cola,coke,sprite,juice,orange juice,apple juice,lemonade,iced tea,coffee,tea,beer,wine,vodka,whiskey,kombucha,energy drink,gatorade,almond milk,oat milk,soy milk',
+    household: 'paper towel,toilet paper,tissues,napkins,trash bags,garbage bags,foil,aluminum foil,plastic wrap,ziploc,sandwich bags,dish soap,dishwasher,detergent,laundry,bleach,cleaner,sponge,batteries,light bulb,lightbulb,candles,wipes,dryer sheets,fabric softener,air freshener,matches,paper plates,cups',
+    personal: 'shampoo,conditioner,soap,body wash,toothpaste,toothbrush,floss,mouthwash,deodorant,razor,shaving,lotion,sunscreen,vitamin,medicine,tylenol,advil,ibuprofen,band-aid,bandages,cotton,tampons,pads,makeup,lip balm,contact lens',
+    baby: 'diaper,baby,formula,baby wipes,baby food,pacifier',
+    pets: 'dog food,cat food,cat litter,litter,pet food,dog treats,cat treats',
+  };
+  const GUESS = [];
+  for (const [cat, words] of Object.entries(KEYWORDS)) {
+    for (const w of words.split(',')) GUESS.push([w.trim(), cat]);
+  }
+
+  const UNITS = 'kg|g|lb|lbs|oz|l|ml|pack|packs|pk|bag|bags|box|boxes|can|cans|bottle|bottles|dozen|doz|bunch|bunches|jar|jars|ct|loaf|loaves|carton|cartons';
+  const LEAD_QTY = new RegExp(`^(\\d+(?:[.,]\\d+)?|½|¼|¾)\\s*(?:x|×)?\\s*(?:(${UNITS})\\.?\\s+)?(.+)$`, 'i');
+
+  /* ============================================================== helpers */
+
+  const $ = (s, el = document) => el.querySelector(s);
+
+  function h(tag, attrs, ...kids) {
+    const el = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs || {})) {
+      if (v === null || v === undefined || v === false) continue;
+      if (k === 'class') el.className = v;
+      else if (k === 'cat') el.style.setProperty('--cat', v);
+      else if (k === 'text') el.textContent = v;
+      else el.setAttribute(k, v === true ? '' : v);
+    }
+    for (const kid of kids.flat()) {
+      if (kid === null || kid === undefined || kid === false) continue;
+      el.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
+    }
+    return el;
+  }
+
+  function svg(markup) {
+    const t = document.createElement('template');
+    t.innerHTML = markup.trim();
+    return t.content.firstChild;
+  }
+  const CHECK_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+  function uid() {
+    const bytes = new Uint8Array(12);
+    crypto.getRandomValues(bytes); // works on plain http too, unlike randomUUID
+    return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* full or blocked */ } },
+    del(k) { try { localStorage.removeItem(k); } catch { /* ignore */ } },
+  };
+
+  const keyOf = (name) => name.trim().toLowerCase();
+  const catOf = (id) => CAT[id] || CAT.other;
+
+  function guessCategory(name) {
+    const n = ` ${name.toLowerCase().replace(/[^a-z0-9\u00c0-\u024f'-]+/g, ' ').trim()} `;
+    if (/ frozen /.test(n)) return 'frozen';
+    let best = 'other';
+    let bestEnd = -1;
+    let bestLen = 0;
+    for (const [w, cat] of GUESS) {
+      let i = n.indexOf(` ${w}`);
+      while (i >= 0) {
+        // Prefer the match that ends last (the head noun: "apple juice" is a drink), then the longest keyword.
+        const end = n.indexOf(' ', i + 1 + w.length);
+        if (end > bestEnd || (end === bestEnd && w.length > bestLen)) { best = cat; bestEnd = end; bestLen = w.length; }
+        i = n.indexOf(` ${w}`, i + 1);
+      }
+    }
+    return best;
+  }
+
+  function parseEntry(raw) {
+    let s = raw.trim()
+      .replace(/^(?:[-*•·]|\[[ xX]?\]|\d+[.)])\s+/, '')
+      .trim();
+    let qty = '';
+    let m = s.match(LEAD_QTY);
+    if (m && m[3] && /[a-z\u00c0-\u024f]/i.test(m[3][0])) {
+      qty = m[2] ? `${m[1]} ${m[2].toLowerCase()}` : m[1];
+      s = m[3];
+    } else if ((m = s.match(/^(.+?)\s+[x×]\s*(\d+)$/i)) || (m = s.match(/^(.+?)\s*\((\d+[^)]*)\)$/))) {
+      s = m[1];
+      qty = m[2];
+    }
+    s = s.replace(/\s+/g, ' ').trim();
+    if (s) s = s[0].toLocaleUpperCase() + s.slice(1);
+    return { name: s.slice(0, 120), qty: qty.slice(0, 40) };
+  }
+
+  function bumpQty(qty, delta) {
+    const m = String(qty || '').match(/^(\d+)(.*)$/);
+    if (!m) {
+      if (!qty) return delta > 0 ? '2' : '';
+      return qty;
+    }
+    const n = Math.max(0, parseInt(m[1], 10) + delta);
+    if (n <= 1 && !m[2].trim()) return '';
+    return `${Math.max(1, n)}${m[2]}`;
+  }
+
+  /* ================================================================ state */
+
+  // server: last state the server confirmed. outbox: changes not yet confirmed.
+  // What you see = server state with the outbox replayed on top, so offline edits show immediately.
+  let server = store.get('sl.server', null);
+  let outbox = store.get('sl.outbox', []);
+  let view = null;
+  let currentId = store.get('sl.list', null);
+  let cartOpen = store.get('sl.cartOpen', true);
+  let reachable = true;
+  let syncing = false;
+  let retryDelay = 1000;
+  let retryTimer = null;
+  let authRequired = false;
+  let events = null;
+  let flashId = null;
+
+  function apply(s, op) {
+    const list = (id) => s.lists.find((l) => l.id === id);
+    const now = Date.now();
+    switch (op.type) {
+      case 'addItem': {
+        const l = list(op.listId);
+        if (!l || l.items.some((i) => i.id === op.item.id)) break;
+        l.items.push({ qty: '', note: '', checked: false, checkedAt: null, createdAt: now, updatedAt: now, ...op.item });
+        remember(s, op.item.name, op.item.category, true);
+        break;
+      }
+      case 'updateItem': {
+        const l = list(op.listId);
+        const it = l && l.items.find((i) => i.id === op.itemId);
+        if (!it) break;
+        if ('checked' in op.patch && op.patch.checked !== it.checked) it.checkedAt = op.patch.checked ? now : null;
+        Object.assign(it, op.patch, { updatedAt: now });
+        if ('name' in op.patch || 'category' in op.patch) remember(s, it.name, it.category, false);
+        break;
+      }
+      case 'deleteItem': {
+        const l = list(op.listId);
+        if (l) l.items = l.items.filter((i) => i.id !== op.itemId);
+        break;
+      }
+      case 'addList':
+        if (!list(op.list.id)) s.lists.push({ id: op.list.id, name: op.list.name, createdAt: now, items: [] });
+        break;
+      case 'renameList': {
+        const l = list(op.listId);
+        if (l) l.name = op.name;
+        break;
+      }
+      case 'deleteList':
+        if (s.lists.length > 1) s.lists = s.lists.filter((l) => l.id !== op.listId);
+        break;
+      case 'clearChecked': {
+        const l = list(op.listId);
+        if (l) l.items = l.items.filter((i) => !i.checked);
+        break;
+      }
+      case 'uncheckAll': {
+        const l = list(op.listId);
+        if (l) l.items.forEach((i) => { i.checked = false; i.checkedAt = null; });
+        break;
+      }
+      case 'clearAll': {
+        const l = list(op.listId);
+        if (l) l.items = [];
+        break;
+      }
+      case 'forget':
+        s.history = s.history.filter((x) => x.key !== op.key);
+        break;
+      default:
+        break;
+    }
+    return s;
+  }
+
+  function remember(s, name, category, bump) {
+    const key = keyOf(name);
+    let x = s.history.find((e) => e.key === key);
+    if (!x) { x = { key, name, category, count: 0, lastUsed: 0 }; s.history.push(x); }
+    x.name = name;
+    x.category = category;
+    if (bump) { x.count += 1; x.lastUsed = Date.now(); }
+  }
+
+  function toRequest(op) {
+    const L = (id) => `api/lists/${encodeURIComponent(id)}`;
+    const I = (id) => encodeURIComponent(id);
+    switch (op.type) {
+      case 'addItem': return ['POST', `${L(op.listId)}/items`, op.item];
+      case 'updateItem': return ['PATCH', `${L(op.listId)}/items/${I(op.itemId)}`, op.patch];
+      case 'deleteItem': return ['DELETE', `${L(op.listId)}/items/${I(op.itemId)}`];
+      case 'addList': return ['POST', 'api/lists', op.list];
+      case 'renameList': return ['PATCH', L(op.listId), { name: op.name }];
+      case 'deleteList': return ['DELETE', L(op.listId)];
+      case 'clearChecked': return ['POST', `${L(op.listId)}/clear-checked`, {}];
+      case 'uncheckAll': return ['POST', `${L(op.listId)}/uncheck-all`, {}];
+      case 'clearAll': return ['POST', `${L(op.listId)}/clear-all`, {}];
+      case 'forget': return ['DELETE', `api/history/${I(op.key)}`];
+      default: throw new Error(`Unknown change ${op.type}`);
+    }
+  }
+
+  function recompute() {
+    if (!server) { view = null; return; }
+    view = outbox.reduce((s, op) => apply(s, op), structuredClone(server));
+    if (!view.lists.some((l) => l.id === currentId)) {
+      currentId = view.lists[0] && view.lists[0].id;
+      store.set('sl.list', currentId);
+    }
+  }
+
+  function setServer(st) {
+    if (!st || !Array.isArray(st.lists)) return;
+    if (!server || st.instance !== server.instance || st.version >= server.version) {
+      server = st;
+      store.set('sl.server', server);
+    }
+  }
+
+  const currentList = () => view && view.lists.find((l) => l.id === currentId);
+
+  /* ============================================================ networking */
+
+  class ApiError extends Error {
+    constructor(status, message) { super(message); this.status = status; }
+  }
+
+  async function api(method, url, body) {
+    let res;
+    try {
+      res = await fetch(url, {
+        method,
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: body !== undefined ? { 'Content-Type': 'application/json' } : {},
+        body: body !== undefined ? JSON.stringify(body) : undefined,
+      });
+    } catch {
+      throw new ApiError(0, 'Can’t reach the server.');
+    }
+    let data = null;
+    try { data = await res.json(); } catch { /* not JSON */ }
+    if (!res.ok) throw new ApiError(res.status, (data && data.error) || `The server answered ${res.status}.`);
+    return data;
+  }
+
+  function dispatch(op) {
+    outbox.push(op);
+    store.set('sl.outbox', outbox);
+    recompute();
+    render();
+    flushOutbox();
+  }
+
+  async function flushOutbox() {
+    if (syncing || !outbox.length) { renderSync(); return; }
+    syncing = true;
+    clearTimeout(retryTimer);
+    renderSync();
+    try {
+      while (outbox.length) {
+        const op = outbox[0];
+        try {
+          setServer(await api(...toRequest(op)));
+          outbox.shift();
+          setReachable(true);
+          retryDelay = 1000;
+        } catch (err) {
+          if (err.status === 0 || err.status >= 500 || err.status === 429) {
+            setReachable(err.status !== 0);
+            retryTimer = setTimeout(flushOutbox, retryDelay);
+            retryDelay = Math.min(retryDelay * 2, 30000);
+            break;
+          }
+          if (err.status === 401) { showLogin(); break; }
+          // The server refused this change (e.g. the item was deleted elsewhere). Drop it and resync.
+          outbox.shift();
+          toast(err.message);
+        }
+        store.set('sl.outbox', outbox);
+      }
+    } finally {
+      syncing = false;
+      store.set('sl.outbox', outbox);
+      recompute();
+      render();
+    }
+  }
+
+  async function refresh() {
+    try {
+      setServer(await api('GET', 'api/state'));
+      setReachable(true);
+      recompute();
+      render();
+      if (outbox.length) flushOutbox();
+      return true;
+    } catch (err) {
+      if (err.status === 401) showLogin();
+      else setReachable(false);
+      return false;
+    }
+  }
+
+  function connectEvents() {
+    if (events) events.close();
+    if (!window.EventSource) return;
+    events = new EventSource('api/events');
+    events.addEventListener('version', (e) => {
+      setReachable(true);
+      const v = Number(e.data);
+      if (!server || v !== server.version) refresh();
+    });
+    events.onerror = () => {
+      if (events.readyState === EventSource.CLOSED) setTimeout(connectEvents, 5000);
+      else setReachable(false);
+    };
+  }
+
+  function setReachable(ok) {
+    if (reachable === ok) return;
+    reachable = ok;
+    renderSync();
+    if (ok && outbox.length) flushOutbox();
+  }
+
+  /* ============================================================ rendering */
+
+  const els = {};
+
+  function render() {
+    renderSync();
+    const list = currentList();
+    if (!list) return;
+
+    els.listName.textContent = list.name;
+    document.title = `${list.name} – Shopping list`;
+
+    const todo = list.items.filter((i) => !i.checked).sort((a, b) => a.createdAt - b.createdAt);
+    const done = list.items.filter((i) => i.checked).sort((a, b) => (b.checkedAt || 0) - (a.checkedAt || 0));
+    const total = list.items.length;
+
+    // Aisle strip
+    const ordered = [...list.items].sort((a, b) =>
+      CATS.indexOf(catOf(a.category)) - CATS.indexOf(catOf(b.category)) || a.createdAt - b.createdAt);
+    els.strip.replaceChildren(...ordered.map((i) =>
+      h('span', { class: `tick${i.checked ? ' on' : ''}`, cat: catOf(i.category).color })));
+
+    if (!total) els.progressText.textContent = 'Nothing on this list yet';
+    else if (!todo.length) els.progressText.textContent = `All ${total} in the cart`;
+    else els.progressText.textContent = `${done.length} of ${total} in the cart`;
+
+    // To get, grouped by aisle
+    const groups = CATS
+      .map((c) => ({ c, items: todo.filter((i) => catOf(i.category).id === c.id) }))
+      .filter((g) => g.items.length);
+    els.toGet.replaceChildren(...groups.map(({ c, items }) =>
+      h('section', { class: 'aisle', cat: c.color, 'aria-label': c.label },
+        h('h2', { class: 'aisle-head' }, c.label, h('span', { class: 'aisle-count', text: String(items.length) })),
+        h('ul', { class: 'rows', cat: c.color }, items.map(itemRow)))));
+
+    // Empty states
+    if (!total) {
+      els.empty.replaceChildren(
+        h('strong', { text: 'This list is empty' }),
+        'Add what you need below. Items sort themselves into aisles, and you can type “2 avocados” or paste a whole list.');
+      els.empty.hidden = false;
+    } else if (!todo.length) {
+      els.empty.replaceChildren(
+        h('strong', { text: 'Everything’s in the cart' }),
+        'Clear the cart to start fresh, or put items back to reuse this list.',
+        h('br'),
+        h('button', { class: 'btn btn-primary', type: 'button', 'data-cmd': 'clearChecked' }, 'Clear the cart'));
+      els.empty.hidden = false;
+    } else {
+      els.empty.hidden = true;
+    }
+
+    // In the cart
+    els.cart.hidden = !done.length;
+    els.cartTitle.textContent = `In the cart (${done.length})`;
+    els.cartToggle.setAttribute('aria-expanded', String(cartOpen));
+    els.cartItems.hidden = !cartOpen;
+    els.cartItems.replaceChildren(...done.map(itemRow));
+
+    if (flashId) {
+      const row = document.querySelector(`[data-id="${CSS.escape(flashId)}"]`);
+      if (row) {
+        row.classList.remove('flash');
+        void row.offsetWidth;
+        row.classList.add('flash');
+        row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+      flashId = null;
+    }
+  }
+
+  function itemRow(it) {
+    const c = catOf(it.category);
+    const box = h('span', { class: 'box' });
+    box.append(svg(CHECK_SVG));
+    return h('li', { class: `item${it.checked ? ' is-checked' : ''}`, 'data-id': it.id, cat: c.color },
+      h('button', {
+        class: 'check', type: 'button', 'data-action': 'toggle',
+        role: 'checkbox', 'aria-checked': String(it.checked), 'aria-label': it.name,
+      }, box),
+      h('button', { class: 'item-body', type: 'button', 'data-action': 'edit', 'aria-label': `Edit ${it.name}` },
+        h('span', { class: 'item-name', text: it.name }),
+        it.note ? h('span', { class: 'item-note', text: it.note }) : null),
+      it.qty ? h('span', { class: 'qty', text: it.qty }) : null);
+  }
+
+  function renderSync() {
+    if (!els.sync) return;
+    const pending = outbox.length;
+    let state = 'ok';
+    let label = 'Synced';
+    if (!reachable) { state = 'offline'; label = 'Offline'; }
+    else if (pending) { state = 'pending'; label = 'Saving'; }
+    els.sync.dataset.state = state;
+    els.sync.textContent = label;
+    if (!reachable) {
+      els.offline.textContent = pending
+        ? `Offline. ${pending} change${pending === 1 ? '' : 's'} saved on this device will sync when the connection is back.`
+        : 'Offline. You can keep checking things off; changes sync when the connection is back.';
+      els.offline.hidden = false;
+    } else {
+      els.offline.hidden = true;
+    }
+  }
+
+  /* =============================================================== toasts */
+
+  let toastTimer = null;
+  function toast(message, action, onAction) {
+    els.toastText.textContent = message;
+    els.toastAction.hidden = !action;
+    els.toastAction.textContent = action || '';
+    els.toastAction.onclick = () => { hideToast(); if (onAction) onAction(); };
+    els.toast.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(hideToast, action ? 6000 : 3000);
+  }
+  function hideToast() { els.toast.hidden = true; }
+
+  /* =========================================================== add items */
+
+  function addByName(raw, opts = {}) {
+    const list = currentList();
+    if (!list) return null;
+    const { name, qty } = opts.parsed ? { name: raw, qty: '' } : parseEntry(raw);
+    if (!name) return null;
+    const key = keyOf(name);
+    const existing = list.items.find((i) => keyOf(i.name) === key);
+    if (existing) {
+      if (existing.checked) {
+        const patch = { checked: false };
+        if (qty) patch.qty = qty;
+        dispatch({ type: 'updateItem', listId: list.id, itemId: existing.id, patch });
+        if (!opts.quiet) toast(`${existing.name} is back on the list`);
+      } else {
+        if (qty && qty !== existing.qty) dispatch({ type: 'updateItem', listId: list.id, itemId: existing.id, patch: { qty } });
+        if (!opts.quiet) toast(qty && qty !== existing.qty ? `Updated ${existing.name} to ${qty}` : `${existing.name} is already on the list`);
+      }
+      flashId = existing.id;
+      render();
+      return existing.id;
+    }
+    const known = view.history.find((x) => x.key === key);
+    const item = {
+      id: uid(),
+      name: known && known.name.toLowerCase() === name.toLowerCase() ? known.name : name,
+      qty,
+      note: '',
+      category: (known && known.category) || guessCategory(name),
+      createdAt: Date.now(),
+    };
+    dispatch({ type: 'addItem', listId: list.id, item });
+    flashId = item.id;
+    render();
+    return item.id;
+  }
+
+  function addMany(text) {
+    const lines = text.split(/\r?\n|,(?=\s*\S)/).map((s) => s.trim()).filter(Boolean);
+    let n = 0;
+    for (const line of lines) if (addByName(line, { quiet: true })) n += 1;
+    toast(`Added ${n} item${n === 1 ? '' : 's'}`);
+  }
+
+  /* ========================================================= suggestions */
+
+  let suggItems = [];
+  let suggIndex = -1;
+
+  function updateSuggestions() {
+    const list = currentList();
+    if (!list || !view) return;
+    const q = els.addInput.value.trim().toLowerCase();
+    const onList = new Set(list.items.filter((i) => !i.checked).map((i) => keyOf(i.name)));
+    const pool = view.history.filter((x) => !onList.has(x.key));
+    let label;
+    if (!q) {
+      suggItems = pool.slice().sort((a, b) => b.count - a.count || b.lastUsed - a.lastUsed).slice(0, 6);
+      label = 'You often buy';
+    } else {
+      const parsed = parseEntry(q).name.toLowerCase();
+      const term = parsed || q;
+      suggItems = pool
+        .map((x) => {
+          const n = x.key;
+          let score = 0;
+          if (n.startsWith(term)) score = 3;
+          else if (n.includes(` ${term}`)) score = 2;
+          else if (n.includes(term)) score = 1;
+          return { x, score };
+        })
+        .filter((r) => r.score && r.x.key !== term)
+        .sort((a, b) => b.score - a.score || b.x.count - a.x.count)
+        .slice(0, 6)
+        .map((r) => r.x);
+      label = null;
+    }
+    suggIndex = -1;
+    if (!suggItems.length || document.activeElement !== els.addInput) {
+      hideSuggestions();
+      return;
+    }
+    const kids = [];
+    if (label) kids.push(h('li', { class: 'sugg-label', role: 'presentation', text: label }));
+    suggItems.forEach((x, i) => {
+      const c = catOf(x.category);
+      kids.push(h('li', { class: 'sugg', role: 'option', id: `sugg-${i}`, 'aria-selected': 'false', cat: c.color },
+        h('button', { class: 'sugg-pick', type: 'button', tabindex: '-1', 'data-pick': String(i) },
+          x.name, h('span', { class: 'sugg-meta', text: c.label })),
+        h('button', { class: 'sugg-forget', type: 'button', tabindex: '-1', 'data-forget': String(i), 'aria-label': `Stop suggesting ${x.name}` }, '×')));
+    });
+    els.suggestions.replaceChildren(...kids);
+    els.suggestions.hidden = false;
+    els.addInput.setAttribute('aria-expanded', 'true');
+  }
+
+  function hideSuggestions() {
+    els.suggestions.hidden = true;
+    els.addInput.setAttribute('aria-expanded', 'false');
+    els.addInput.removeAttribute('aria-activedescendant');
+    suggIndex = -1;
+  }
+
+  function highlight(i) {
+    suggIndex = i;
+    els.suggestions.querySelectorAll('.sugg').forEach((el, j) => el.setAttribute('aria-selected', String(j === i)));
+    if (i >= 0) els.addInput.setAttribute('aria-activedescendant', `sugg-${i}`);
+    else els.addInput.removeAttribute('aria-activedescendant');
+  }
+
+  function pickSuggestion(i) {
+    const x = suggItems[i];
+    if (!x) return;
+    const { qty } = parseEntry(els.addInput.value);
+    addByName(qty ? `${qty} ${x.name}` : x.name);
+    els.addInput.value = '';
+    updateSuggestions();
+    els.addInput.focus();
+  }
+
+  /* ========================================================== edit sheet */
+
+  let editing = null;
+
+  function openEdit(itemId) {
+    const list = currentList();
+    const it = list && list.items.find((i) => i.id === itemId);
+    if (!it) return;
+    editing = { listId: list.id, item: { ...it } };
+    $('#fName').value = it.name;
+    $('#fQty').value = it.qty || '';
+    $('#fNote').value = it.note || '';
+    const cats = $('#fCats');
+    cats.replaceChildren(...CATS.map((c) =>
+      h('label', { class: 'cat-chip', cat: c.color },
+        h('input', { type: 'radio', name: 'fCat', value: c.id, checked: catOf(it.category).id === c.id }),
+        h('span', { text: c.label }))));
+    const sel = $('#fList');
+    sel.replaceChildren(...view.lists.map((l) => h('option', { value: l.id, selected: l.id === list.id }, l.name)));
+    $('#fListWrap').hidden = view.lists.length < 2;
+    openSheet(els.itemSheet);
+  }
+
+  function saveEdit() {
+    if (!editing) return;
+    const { listId, item } = editing;
+    const name = parseEntry($('#fName').value).name || item.name;
+    const qty = $('#fQty').value.trim();
+    const note = $('#fNote').value.replace(/\s+/g, ' ').trim();
+    const chosen = document.querySelector('input[name="fCat"]:checked');
+    const category = chosen ? chosen.value : item.category;
+    const targetList = $('#fList').value || listId;
+
+    if (targetList !== listId) {
+      const dest = view.lists.find((l) => l.id === targetList);
+      const clash = dest && dest.items.find((i) => keyOf(i.name) === keyOf(name) && !i.checked);
+      if (!clash) {
+        dispatch({ type: 'addItem', listId: targetList, item: { id: uid(), name, qty, note, category, createdAt: Date.now() } });
+      }
+      dispatch({ type: 'deleteItem', listId, itemId: item.id });
+      toast(`Moved ${name} to ${dest ? dest.name : 'the other list'}`);
+    } else {
+      const patch = {};
+      if (name !== item.name) patch.name = name;
+      if (qty !== (item.qty || '')) patch.qty = qty;
+      if (note !== (item.note || '')) patch.note = note;
+      if (category !== item.category) patch.category = category;
+      if (Object.keys(patch).length) dispatch({ type: 'updateItem', listId, itemId: item.id, patch });
+    }
+    editing = null;
+  }
+
+  function deleteItem(listId, item) {
+    dispatch({ type: 'deleteItem', listId, itemId: item.id });
+    toast(`Deleted ${item.name}`, 'Undo', () => {
+      dispatch({ type: 'addItem', listId, item: { ...item } });
+    });
+  }
+
+  /* ============================================================== sheets */
+
+  function openSheet(dlg) {
+    hideSuggestions();
+    if (typeof dlg.showModal === 'function') dlg.showModal();
+    else dlg.setAttribute('open', '');
+  }
+  function closeSheet(dlg) {
+    if (typeof dlg.close === 'function') dlg.close();
+    else dlg.removeAttribute('open');
+  }
+
+  function ask({ title, body = '', ok = 'OK', danger = false, input = null }) {
+    return new Promise((resolve) => {
+      const dlg = els.askSheet;
+      $('#askTitle').textContent = title;
+      $('#askBody').textContent = body;
+      const okBtn = $('#askOk');
+      okBtn.textContent = ok;
+      okBtn.className = danger ? 'btn btn-primary btn-danger-fill' : 'btn btn-primary';
+      if (danger) { okBtn.style.background = 'var(--danger)'; okBtn.style.color = '#fff'; }
+      else { okBtn.style.background = ''; okBtn.style.color = ''; }
+      const field = $('#askInput');
+      field.hidden = input === null;
+      field.value = input || '';
+      dlg.returnValue = '';
+      const done = () => {
+        dlg.removeEventListener('close', done);
+        if (dlg.returnValue !== 'ok') return resolve(null);
+        resolve(input === null ? true : field.value.trim());
+      };
+      dlg.addEventListener('close', done);
+      openSheet(dlg);
+      if (input !== null) { field.focus(); field.select(); }
+    });
+  }
+
+  function renderLists() {
+    const items = view.lists.map((l) => {
+      const left = l.items.filter((i) => !i.checked).length;
+      return h('li', {},
+        h('button', { class: 'choice', type: 'button', 'data-list': l.id, 'aria-current': String(l.id === currentId) },
+          l.name, h('span', { class: 'choice-meta', text: left ? `${left} to get` : 'Done' })));
+    });
+    els.listsList.replaceChildren(...items);
+  }
+
+  function switchList(id) {
+    currentId = id;
+    store.set('sl.list', id);
+    recompute();
+    render();
+    window.scrollTo({ top: 0 });
+  }
+
+  /* =========================================================== commands */
+
+  let wakeLock = null;
+
+  async function runCommand(cmd) {
+    const list = currentList();
+    if (!list) return;
+    closeSheet(els.menuSheet);
+    switch (cmd) {
+      case 'share': return shareList(list);
+      case 'wake': return toggleWake();
+      case 'uncheck':
+        if (!list.items.some((i) => i.checked)) return toast('Nothing in the cart yet');
+        dispatch({ type: 'uncheckAll', listId: list.id });
+        return toast('Everything is back on the list');
+      case 'clearChecked': {
+        const n = list.items.filter((i) => i.checked).length;
+        if (!n) return toast('Nothing in the cart yet');
+        const removed = list.items.filter((i) => i.checked).map((i) => ({ ...i }));
+        dispatch({ type: 'clearChecked', listId: list.id });
+        return toast(`Cleared ${n} item${n === 1 ? '' : 's'}`, 'Undo', () => {
+          removed.forEach((item) => dispatch({ type: 'addItem', listId: list.id, item }));
+        });
+      }
+      case 'rename': {
+        const name = await ask({ title: 'Rename list', ok: 'Rename', input: list.name });
+        if (name && name !== list.name) dispatch({ type: 'renameList', listId: list.id, name: name.slice(0, 60) });
+        return undefined;
+      }
+      case 'clearAll': {
+        if (!list.items.length) return toast('This list is already empty');
+        const okay = await ask({ title: `Remove all ${list.items.length} items?`, body: `Everything on “${list.name}” will be removed. Suggestions are kept.`, ok: 'Remove all', danger: true });
+        if (okay) dispatch({ type: 'clearAll', listId: list.id });
+        return undefined;
+      }
+      case 'deleteList': {
+        if (view.lists.length === 1) return toast('Keep at least one list');
+        const okay = await ask({ title: `Delete “${list.name}”?`, body: 'The list and its items will be removed on every device.', ok: 'Delete list', danger: true });
+        if (okay) { dispatch({ type: 'deleteList', listId: list.id }); toast(`Deleted ${list.name}`); }
+        return undefined;
+      }
+      case 'logout':
+        await api('POST', 'api/logout', {}).catch(() => {});
+        store.del('sl.server');
+        location.reload();
+        return undefined;
+      default:
+        return undefined;
+    }
+  }
+
+  async function shareList(list) {
+    const todo = list.items.filter((i) => !i.checked);
+    if (!todo.length) return toast('Nothing left to get on this list');
+    const lines = [list.name];
+    for (const c of CATS) {
+      const items = todo.filter((i) => catOf(i.category).id === c.id);
+      if (!items.length) continue;
+      lines.push('', c.label);
+      for (const i of items) lines.push(`• ${i.name}${i.qty ? ` (${i.qty})` : ''}${i.note ? ` – ${i.note}` : ''}`);
+    }
+    const text = lines.join('\n');
+    if (navigator.share) {
+      try { await navigator.share({ title: list.name, text }); return undefined; }
+      catch (err) { if (err && err.name === 'AbortError') return undefined; }
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      return toast('List copied');
+    } catch {
+      const ta = h('textarea', {});
+      ta.value = text;
+      document.body.append(ta);
+      ta.select();
+      const ok = document.execCommand && document.execCommand('copy');
+      ta.remove();
+      return toast(ok ? 'List copied' : 'Copying isn’t available here');
+    }
+  }
+
+  async function toggleWake() {
+    try {
+      if (wakeLock) { await wakeLock.release(); wakeLock = null; toast('Screen can sleep again'); }
+      else {
+        wakeLock = await navigator.wakeLock.request('screen');
+        wakeLock.addEventListener('release', () => { if (!document.hidden) wakeLock = null; updateWakeBtn(); });
+        toast('Screen will stay on while this is open');
+      }
+    } catch {
+      toast('This browser won’t keep the screen on');
+    }
+    updateWakeBtn();
+  }
+  function updateWakeBtn() { els.wakeBtn.setAttribute('aria-pressed', String(!!wakeLock)); }
+
+  /* ============================================================== events */
+
+  function bind() {
+    // Item rows (toggle + edit)
+    const onRowClick = (e) => {
+      const btn = e.target.closest('[data-action]');
+      const row = e.target.closest('[data-id]');
+      if (!btn || !row) return;
+      const list = currentList();
+      const it = list.items.find((i) => i.id === row.dataset.id);
+      if (!it) return;
+      if (btn.dataset.action === 'toggle') {
+        if (navigator.vibrate) navigator.vibrate(8);
+        dispatch({ type: 'updateItem', listId: list.id, itemId: it.id, patch: { checked: !it.checked } });
+      } else {
+        openEdit(it.id);
+      }
+    };
+    els.main.addEventListener('click', onRowClick);
+    els.main.addEventListener('click', (e) => {
+      const c = e.target.closest('[data-cmd]');
+      if (c) runCommand(c.dataset.cmd);
+    });
+
+    els.cartToggle.addEventListener('click', () => {
+      cartOpen = !cartOpen;
+      store.set('sl.cartOpen', cartOpen);
+      render();
+    });
+    els.cartClear.addEventListener('click', () => runCommand('clearChecked'));
+
+    // Add bar
+    els.addForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (suggIndex >= 0) return pickSuggestion(suggIndex);
+      const v = els.addInput.value;
+      if (!v.trim()) return undefined;
+      addByName(v);
+      els.addInput.value = '';
+      updateSuggestions();
+      els.addInput.focus();
+      return undefined;
+    });
+    els.addInput.addEventListener('input', updateSuggestions);
+    els.addInput.addEventListener('focus', updateSuggestions);
+    els.addInput.addEventListener('blur', () => setTimeout(() => {
+      if (!els.addForm.contains(document.activeElement)) hideSuggestions();
+    }, 150));
+    els.addInput.addEventListener('keydown', (e) => {
+      if (els.suggestions.hidden) return;
+      if (e.key === 'ArrowDown') { e.preventDefault(); highlight(Math.min(suggIndex + 1, suggItems.length - 1)); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); highlight(Math.max(suggIndex - 1, -1)); }
+      else if (e.key === 'Escape') hideSuggestions();
+    });
+    els.addInput.addEventListener('paste', (e) => {
+      const text = (e.clipboardData || window.clipboardData).getData('text');
+      if (/\n/.test(text.trim())) {
+        e.preventDefault();
+        addMany(text);
+        els.addInput.value = '';
+        updateSuggestions();
+      }
+    });
+    els.suggestions.addEventListener('pointerdown', (e) => e.preventDefault()); // keep the keyboard open
+    els.suggestions.addEventListener('click', (e) => {
+      const pick = e.target.closest('[data-pick]');
+      const forget = e.target.closest('[data-forget]');
+      if (pick) pickSuggestion(Number(pick.dataset.pick));
+      else if (forget) {
+        const x = suggItems[Number(forget.dataset.forget)];
+        if (x) dispatch({ type: 'forget', key: x.key });
+        updateSuggestions();
+      }
+    });
+
+    // Sheets: close buttons and backdrop taps
+    document.querySelectorAll('dialog').forEach((dlg) => {
+      dlg.addEventListener('click', (e) => {
+        if (e.target === dlg || e.target.closest('[data-close]')) closeSheet(dlg);
+      });
+    });
+
+    // Edit sheet
+    $('#itemForm').addEventListener('submit', (e) => {
+      if (e.submitter && e.submitter.value === 'save') saveEdit();
+    });
+    els.itemSheet.addEventListener('close', () => { editing = null; });
+    $('#fDelete').addEventListener('click', () => {
+      if (!editing) return;
+      const { listId, item } = editing;
+      editing = null;
+      closeSheet(els.itemSheet);
+      deleteItem(listId, item);
+    });
+    document.querySelectorAll('[data-step]').forEach((b) => b.addEventListener('click', () => {
+      const f = $('#fQty');
+      f.value = bumpQty(f.value, Number(b.dataset.step));
+    }));
+
+    // Lists sheet
+    els.listSwitch.addEventListener('click', () => { renderLists(); openSheet(els.listsSheet); });
+    els.listsList.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-list]');
+      if (!b) return;
+      switchList(b.dataset.list);
+      closeSheet(els.listsSheet);
+    });
+    $('#newListForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const input = $('#newListName');
+      const name = input.value.trim().slice(0, 60);
+      if (!name) { input.focus(); return; }
+      const id = uid();
+      dispatch({ type: 'addList', list: { id, name } });
+      input.value = '';
+      switchList(id);
+      closeSheet(els.listsSheet);
+      toast(`Created ${name}`);
+    });
+
+    // Menu sheet
+    els.menuBtn.addEventListener('click', () => {
+      $('#menuTitle').textContent = currentList().name;
+      openSheet(els.menuSheet);
+    });
+    els.menuSheet.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-cmd]');
+      if (b) runCommand(b.dataset.cmd);
+    });
+
+    // Keyboard shortcut on desktop
+    document.addEventListener('keydown', (e) => {
+      if (e.key === '/' && !e.target.closest('input, textarea, select') && !document.querySelector('dialog[open]')) {
+        e.preventDefault();
+        els.addInput.focus();
+      }
+    });
+
+    // Resync when the app comes back to the foreground
+    document.addEventListener('visibilitychange', async () => {
+      if (document.hidden) return;
+      refresh();
+      if (wakeLock === null && els.wakeBtn.getAttribute('aria-pressed') === 'true') {
+        try { wakeLock = await navigator.wakeLock.request('screen'); } catch { /* ignore */ }
+      }
+    });
+    window.addEventListener('online', () => { refresh(); flushOutbox(); });
+    window.addEventListener('offline', () => setReachable(false));
+  }
+
+  /* =============================================================== login */
+
+  function showLogin() {
+    if (events) { events.close(); events = null; }
+    els.app.hidden = true;
+    els.boot.hidden = true;
+    els.login.hidden = false;
+    $('#password').focus();
+  }
+
+  function bindLogin() {
+    $('#loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const err = $('#loginError');
+      err.textContent = '';
+      try {
+        await api('POST', 'api/login', { password: $('#password').value });
+        $('#password').value = '';
+        els.login.hidden = true;
+        start();
+      } catch (ex) {
+        err.textContent = ex.status === 0 ? 'Can’t reach the server. Check your connection.' : ex.message;
+      }
+    });
+  }
+
+  /* =============================================================== start */
+
+  function showApp() {
+    els.boot.hidden = true;
+    els.login.hidden = true;
+    els.app.hidden = false;
+  }
+
+  async function start() {
+    let session = null;
+    try { session = await api('GET', 'api/session'); }
+    catch { /* offline: fall back to the cached copy */ }
+
+    if (session) {
+      authRequired = session.authRequired;
+      els.logoutBtn.hidden = !authRequired;
+      if (authRequired && !session.authenticated) return showLogin();
+    }
+
+    if (server) { recompute(); showApp(); render(); }
+
+    const ok = await refresh();
+    if (ok) {
+      showApp();
+      connectEvents();
+    } else if (!server) {
+      els.boot.textContent = 'Can’t reach the server. Check that it’s running, then reload this page.';
+      return undefined;
+    } else {
+      setReachable(false);
+      setTimeout(start, 10000);
+    }
+    return undefined;
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    for (const id of ['app', 'boot', 'login', 'main', 'toGet', 'empty', 'cart', 'cartToggle', 'cartTitle', 'cartClear',
+      'cartItems', 'strip', 'progressText', 'listName', 'listSwitch', 'menuBtn', 'offline', 'addForm', 'addInput',
+      'suggestions', 'itemSheet', 'listsSheet', 'listsList', 'menuSheet', 'askSheet', 'toast', 'toastText',
+      'toastAction', 'wakeBtn', 'logoutBtn']) {
+      els[id] = document.getElementById(id);
+    }
+    els.sync = document.getElementById('syncState');
+    els.wakeBtn.hidden = !('wakeLock' in navigator);
+    updateWakeBtn();
+    bind();
+    bindLogin();
+    start();
+
+    if ('serviceWorker' in navigator && window.isSecureContext) {
+      navigator.serviceWorker.register('sw.js').catch(() => { /* offline shell is optional */ });
+    }
+  });
+
+  // Exposed for quick checks in the browser console.
+  window.__shoppingList = { parseEntry, guessCategory };
+})();
