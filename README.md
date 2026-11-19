@@ -14,8 +14,8 @@ A self-hosted, shared shopping list. One small Node server, no dependencies, dat
 - Voice: tap the mic and say items with a short pause between them (Chrome, Edge, Safari)
 - Share a text to the app from Android's share menu once it's installed, or open `/?text=milk%0Aeggs`
 - Checked items move to a hidden "Completed" section; tap it to see them and clear them
-- Shopping mode (the Shop button): black and white like an always-on display, big clock and items-left count,
-  screen stays on, tap anywhere on a row to check it off. Stays on until you tap "Done shopping"
+- Shopping mode (the Shop button): black and white like an always-on display, big clock,
+  screen stays on, tap anywhere on a row to check it off. Stays on until you tap "Done"
 - Edit quantity, aisle, note, or move an item to another list; undo after deleting
 - Live sync between phones (changes appear instantly on every open device)
 - Works offline in the store: changes are saved on the phone and sync when you reconnect

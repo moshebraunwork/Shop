@@ -485,9 +485,6 @@
     els.strip.replaceChildren(...ordered.map((i) =>
       h('span', { class: `tick${i.checked ? ' on' : ''}`, cat: catOf(i.category).color })));
 
-    if (!total) els.progressText.textContent = 'Nothing on this list yet';
-    else if (!todo.length) els.progressText.textContent = `All ${total} done`;
-    else els.progressText.textContent = `${done.length} of ${total} done`;
 
     // To get, grouped by aisle
     const groups = CATS
@@ -495,14 +492,15 @@
       .filter((g) => g.items.length);
     els.toGet.replaceChildren(...groups.map(({ c, items }) =>
       h('section', { class: 'aisle', cat: c.color, 'aria-label': c.label },
-        h('h2', { class: 'aisle-head' }, c.label, h('span', { class: 'aisle-count', text: String(items.length) })),
+        h('h2', { class: 'aisle-head' }, c.label),
         h('ul', { class: 'rows', cat: c.color }, items.map(itemRow)))));
 
     // Empty states
     if (!total) {
       els.empty.replaceChildren(
         h('strong', { text: 'This list is empty' }),
-        'Type or paste what you need below, one item per line or separated by commas, then tap send. Items sort themselves into aisles.');
+        shopping ? 'Tap Done to add items.'
+          : 'Type or paste what you need below, one item per line or separated by commas, then tap send. Items sort themselves into aisles.');
       els.empty.hidden = false;
     } else if (!todo.length) {
       els.empty.replaceChildren(
@@ -523,7 +521,7 @@
     els.cartItems.hidden = !cartOpen;
     els.cartClear.hidden = !cartOpen;
     els.cartItems.replaceChildren(...(cartOpen ? done.map(itemRow) : []));
-    if (shopping) renderShopClock(todo.length);
+    if (shopping) renderShopClock();
 
     if (flashId) {
       const row = document.querySelector(`[data-id="${CSS.escape(flashId)}"]`);
@@ -981,7 +979,7 @@
   /* ======================================================= shopping mode */
 
   // Shopping mode: black screen with white outlines (like an always-on display), the screen stays
-  // awake, the whole row checks an item off, and nothing animates, until "Done shopping".
+  // awake, the whole row checks an item off, and nothing animates, until "Done".
   let clockTimer = null;
 
   async function keepAwake() {
@@ -1036,16 +1034,11 @@
     if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
   }
 
-  function renderShopClock(left) {
+  function renderShopClock() {
     const now = new Date();
     const time = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }).replace(/\s?[AP]M$/i, '');
-    if (left === undefined) {
-      const list = currentList();
-      left = list ? list.items.filter((i) => !i.checked).length : 0;
-    }
     els.shopClock.dateTime = now.toISOString();
-    els.shopClock.replaceChildren(h('span', { class: 'clock-time', text: time }),
-      h('span', { class: 'clock-left', text: left ? `${left} left` : 'All done' }));
+    els.shopClock.textContent = time;
   }
 
 
@@ -1269,7 +1262,7 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     for (const id of ['app', 'boot', 'login', 'main', 'toGet', 'empty', 'cart', 'cartToggle', 'cartTitle', 'cartClear',
-      'cartItems', 'strip', 'progressText', 'listName', 'listSwitch', 'menuBtn', 'offline', 'addForm', 'addInput',
+      'cartItems', 'strip', 'listName', 'listSwitch', 'menuBtn', 'offline', 'addForm', 'addInput',
       'itemSheet', 'listsSheet', 'listsList', 'menuSheet', 'askSheet', 'toast', 'toastText',
       'toastAction', 'logoutBtn', 'bulkSheet', 'micBtn', 'shopBtn', 'shopExit', 'shopClock']) {
       els[id] = document.getElementById(id);
