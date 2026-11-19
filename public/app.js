@@ -28,7 +28,7 @@
     frozen: 'ice cream,ice pop,popsicle,frozen,pizza,fries,french fries,sorbet,waffles,tater tots,latkes,ice',
     pantry: 'rice,pasta,spaghetti,noodle,flour,sugar,salt,black pepper,oil,olive oil,vinegar,sauce,tomato sauce,tomato paste,soy sauce,ketchup,mustard,mayo,mayonnaise,cereal,cornflakes,oats,oatmeal,beans,lentils,chickpeas,canned,soup,broth,stock,tuna,peanut butter,jam,jelly,honey,syrup,maple syrup,spice,cinnamon,paprika,cumin,baking soda,baking powder,yeast,vanilla,cocoa,breadcrumbs,salsa,matzah,matzo,quinoa,couscous,tahini,icing,sprinkles',
     snacks: 'chips,crisps,cookie,cracker,pretzel,popcorn,candy,chocolate,gum,granola bar,nuts,almonds,cashews,peanuts,trail mix,dried fruit,raisins,snack,marshmallow,gummies',
-    drinks: 'water,sparkling water,seltzer,soda,cola,coke,sprite,juice,orange juice,apple juice,lemonade,iced tea,coffee,tea,beer,wine,vodka,whiskey,kombucha,energy drink,gatorade,almond milk,oat milk,soy milk',
+    drinks: 'water,sparkling water,seltzer,soda,cola,coke,sprite,juice,orange juice,apple juice,lemonade,iced tea,coffee,tea,beer,wine,vodka,whiskey,whisky,scotch,bourbon,rum,gin,tequila,liquor,schnapps,arak,kombucha,energy drink,gatorade,almond milk,oat milk,soy milk',
     household: 'paper towel,toilet paper,tissues,napkins,trash bags,garbage bags,foil,aluminum foil,plastic wrap,ziploc,sandwich bags,dish soap,dishwasher,detergent,laundry,bleach,cleaner,sponge,batteries,light bulb,lightbulb,candles,wipes,dryer sheets,fabric softener,air freshener,matches,paper plates,cups',
     personal: 'shampoo,conditioner,soap,body wash,toothpaste,toothbrush,floss,mouthwash,deodorant,razor,shaving,lotion,sunscreen,vitamin,medicine,tylenol,advil,ibuprofen,band-aid,bandages,cotton,tampons,pads,makeup,lip balm,contact lens',
     baby: 'diaper,baby,formula,baby wipes,baby food,pacifier',
@@ -44,7 +44,7 @@
   const NUM_WORDS = {
     a: '1', an: '1', one: '1', two: '2', three: '3', four: '4', five: '5', six: '6', seven: '7', eight: '8',
     nine: '9', ten: '10', eleven: '11', twelve: '12', 'a couple of': '2', 'a couple': '2', couple: '2', 'a few': '3',
-    half: '½', 'a half': '½', 'half a': '½',
+    'a half': '½', 'half a': '½',
   };
   const NUM_WORD_RE = new RegExp(`^(${Object.keys(NUM_WORDS).sort((a, b) => b.length - a.length).join('|')})\\s+(?=\\S)`, 'i');
 
@@ -152,6 +152,8 @@
     return !words.length || words.every((w) => CHATTER.has(w));
   }
 
+  const AND_QTY = new RegExp(`\\s+(?:and|&|plus)\\s+(?=(?:\\d|½|¼|¾|(?:${Object.keys(NUM_WORDS).filter((w) => !/^an?$/.test(w)).join('|')})\\s))`, 'i');
+
   // Phrases about the trip rather than things to buy: "a few things on the way home?"
   const NOT_AN_ITEM = /\b(?:things|stuff|a few items|on (?:the|your) way|when you(?:'re| are)?|if you(?:'re| are)? (?:going|at|near)|while you(?:'re| are)|at the store|to the store|from the store|shopping list|list for|here(?:'s| is) the list)\b/i;
   // Pairs that are one product, so "and" is not a separator inside them.
@@ -204,6 +206,8 @@
         if (parts.length > 1 || asked || voice) {
           parts = parts.flatMap((p) => p.split(/\s+(?:and|plus|then|also|comma)\s+|\s+&\s+(?=\S+\s*$)/i));
         }
+        // "2 onion rolls and 2 rugelach": an "and" followed by a quantity always starts a new item.
+        parts = parts.flatMap((p) => p.split(AND_QTY));
         for (const part of parts) {
           const cleaned = cleanPiece(part.replace(/\u0001/g, ' ')).text;
           if (!cleaned) continue;
@@ -740,6 +744,7 @@
       recog = null;
       els.micBtn.setAttribute('aria-pressed', 'false');
       els.addInput.value = '';
+      sizeAddBox();
       els.addInput.placeholder = els.addInput.dataset.placeholder;
       if (results.length) summarizeAdds(list, results, ' by voice');
       else if (failed) toast(failed);
@@ -773,6 +778,7 @@
   function updateSuggestions() {
     const list = currentList();
     if (!list || !view) return;
+    sizeAddBox();
     const q = els.addInput.value.trim().toLowerCase();
     const onList = new Set(list.items.filter((i) => !i.checked).map((i) => keyOf(i.name)));
     const pool = view.history.filter((x) => !onList.has(x.key));
@@ -819,6 +825,14 @@
     els.suggestions.replaceChildren(...kids);
     els.suggestions.hidden = false;
     els.addInput.setAttribute('aria-expanded', 'true');
+  }
+
+  // The add box is a textarea so pasted line breaks survive however the text arrives
+  // (keyboard clipboard buttons don't always send a paste event). It grows with its content.
+  function sizeAddBox() {
+    const el = els.addInput;
+    el.style.height = '';
+    if (el.value.includes('\n') || el.scrollHeight > el.clientHeight + 2) el.style.height = `${el.scrollHeight + 4}px`;
   }
 
   function hideSuggestions() {
@@ -1098,12 +1112,33 @@
       els.addInput.focus();
       return undefined;
     });
-    els.addInput.addEventListener('input', updateSuggestions);
+    els.addInput.addEventListener('input', (e) => {
+      const v = els.addInput.value;
+      if (v.includes('\n')) {
+        if (e.inputType === 'insertLineBreak' || e.inputType === 'insertParagraph' || /^[^\n]*\n$/.test(v)) {
+          // Enter on a keyboard that didn't send a keydown: treat it as Add.
+          els.addInput.value = v.replace(/\n/g, ' ').trim();
+          els.addForm.requestSubmit();
+          return;
+        }
+        const entries = splitList(v);
+        if (entries.length > 1) {
+          addMany(entries);
+          els.addInput.value = '';
+        }
+      }
+      updateSuggestions();
+    });
     els.addInput.addEventListener('focus', updateSuggestions);
     els.addInput.addEventListener('blur', () => setTimeout(() => {
       if (!els.addForm.contains(document.activeElement)) hideSuggestions();
     }, 150));
     els.addInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+        e.preventDefault();
+        els.addForm.requestSubmit();
+        return;
+      }
       if (els.suggestions.hidden) return;
       if (e.key === 'ArrowDown') { e.preventDefault(); highlight(Math.min(suggIndex + 1, suggItems.length - 1)); }
       else if (e.key === 'ArrowUp') { e.preventDefault(); highlight(Math.max(suggIndex - 1, -1)); }

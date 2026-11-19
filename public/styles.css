@@ -284,18 +284,23 @@ button { cursor: pointer; background: none; border: 0; padding: 0; }
   box-shadow: var(--lift);
 }
 .add-row { display: flex; gap: 10px; }
-.add-row input {
+.add-row { align-items: flex-end; }
+.add-row textarea {
   flex: 1;
   min-width: 0;
   height: 54px;
-  padding: 0 20px;
+  max-height: 30dvh;
+  padding: 13px 20px;
+  line-height: 1.4;
+  resize: none;
+  overflow-y: auto;
   border-radius: 27px;
   border: 2px solid transparent;
   background: var(--sunk);
   font-size: 1.05rem;
 }
-.add-row input:focus { outline: none; border-color: var(--ink); }
-.add-row input::placeholder { color: var(--muted); }
+.add-row textarea:focus { outline: none; border-color: var(--ink); }
+.add-row textarea::placeholder { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .add-btn {
   flex: none;
   width: 54px; height: 54px;
