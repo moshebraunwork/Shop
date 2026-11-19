@@ -498,7 +498,7 @@
     } else if (!todo.length) {
       els.empty.replaceChildren(
         h('strong', { text: 'Everything’s done' }),
-        'Clear the completed items to start fresh, or put them back to reuse this list.',
+        'Clear the completed items to start fresh.',
         h('br'),
         h('button', { class: 'btn btn-primary', type: 'button', 'data-cmd': 'clearChecked' }, 'Clear completed'));
       els.empty.hidden = false;
@@ -651,49 +651,6 @@
     if (entries.length > 1) return addMany(entries);
     if (entries.length === 1) return addByName(entries[0]) ? 1 : 0;
     return addByName(text) ? 1 : 0;
-  }
-
-  /* ======================================================== paste a list */
-
-  function openBulk(prefill = '') {
-    const ta = $('#bulkText');
-    ta.value = prefill;
-    renderBulkPreview();
-    openSheet(els.bulkSheet);
-    if (!prefill) ta.focus();
-  }
-
-  function renderBulkPreview() {
-    const entries = splitList($('#bulkText').value);
-    const list = currentList();
-    const onList = new Set(list ? list.items.filter((i) => !i.checked).map((i) => keyOf(i.name)) : []);
-    const preview = $('#bulkPreview');
-    preview.replaceChildren(...entries.map((e, i) => {
-      const { name, qty } = parseEntry(e);
-      const known = view && view.history.find((x) => x.key === keyOf(name));
-      const c = catOf((known && known.category) || guessCategory(name));
-      const dup = onList.has(keyOf(name));
-      return h('li', { class: 'bulk-row', cat: c.color },
-        h('label', {},
-          h('input', { type: 'checkbox', 'data-i': String(i), checked: !dup }),
-          h('span', { class: 'bulk-name', text: name }),
-          qty ? h('span', { class: 'qty', text: qty }) : null,
-          h('span', { class: 'bulk-meta', text: dup ? 'Already on list' : c.label })));
-    }));
-    preview.hidden = !entries.length;
-    bulkEntries = entries;
-    updateBulkCount();
-  }
-  let bulkEntries = [];
-
-  function updateBulkCount() {
-    const n = $('#bulkPreview').querySelectorAll('input:checked').length;
-    const btn = $('#bulkAdd');
-    btn.textContent = n ? `Add ${n} item${n === 1 ? '' : 's'}` : 'Add items';
-    btn.disabled = !n;
-    $('#bulkHint').textContent = bulkEntries.length
-      ? 'Untick anything you don’t want. Tap Add when it looks right.'
-      : 'Paste a text message or type one item per line. Commas work too.';
   }
 
   /* =============================================================== voice */
@@ -904,12 +861,7 @@
     if (!list) return;
     closeSheet(els.menuSheet);
     switch (cmd) {
-      case 'bulk': return openBulk();
       case 'share': return shareList(list);
-      case 'uncheck':
-        if (!list.items.some((i) => i.checked)) return toast('Nothing completed yet');
-        dispatch({ type: 'uncheckAll', listId: list.id });
-        return toast('Everything is back on the list');
       case 'clearChecked': {
         const n = list.items.filter((i) => i.checked).length;
         if (!n) return toast('Nothing completed yet');
@@ -922,12 +874,6 @@
       case 'rename': {
         const name = await ask({ title: 'Rename list', ok: 'Rename', input: list.name });
         if (name && name !== list.name) dispatch({ type: 'renameList', listId: list.id, name: name.slice(0, 60) });
-        return undefined;
-      }
-      case 'clearAll': {
-        if (!list.items.length) return toast('This list is already empty');
-        const okay = await ask({ title: `Remove all ${list.items.length} items?`, body: `Everything on “${list.name}” will be removed.`, ok: 'Remove all', danger: true });
-        if (okay) dispatch({ type: 'clearAll', listId: list.id });
         return undefined;
       }
       case 'deleteList': {
@@ -1101,29 +1047,6 @@
     els.micBtn.hidden = !SpeechRec;
     els.micBtn.addEventListener('click', toggleVoice);
 
-    // Paste-a-list sheet
-    $('#bulkText').addEventListener('input', renderBulkPreview);
-    $('#bulkPreview').addEventListener('change', updateBulkCount);
-    $('#bulkPaste').hidden = !(navigator.clipboard && navigator.clipboard.readText);
-    $('#bulkPaste').addEventListener('click', async () => {
-      try {
-        const text = await navigator.clipboard.readText();
-        if (!text.trim()) return toast('The clipboard is empty');
-        const ta = $('#bulkText');
-        ta.value = ta.value.trim() ? `${ta.value.trim()}\n${text}` : text;
-        renderBulkPreview();
-      } catch {
-        toast('Long-press the box and choose Paste');
-      }
-      return undefined;
-    });
-    $('#bulkForm').addEventListener('submit', (e) => {
-      if (!e.submitter || e.submitter.value !== 'add') return;
-      const picked = [...$('#bulkPreview').querySelectorAll('input:checked')].map((b) => bulkEntries[Number(b.dataset.i)]);
-      addMany(picked.filter(Boolean));
-      $('#bulkText').value = '';
-    });
-
     // Sheets: close buttons and backdrop taps
     document.querySelectorAll('dialog').forEach((dlg) => {
       dlg.addEventListener('click', (e) => {
@@ -1263,7 +1186,7 @@
     for (const id of ['app', 'boot', 'login', 'main', 'toGet', 'empty', 'cart', 'cartToggle', 'cartTitle', 'cartClear',
       'cartItems', 'listName', 'listSwitch', 'menuBtn', 'offline', 'addForm', 'addInput',
       'itemSheet', 'listsSheet', 'listsList', 'menuSheet', 'askSheet', 'toast', 'toastText',
-      'toastAction', 'logoutBtn', 'bulkSheet', 'micBtn', 'shopBtn', 'shopExit', 'shopClock']) {
+      'toastAction', 'logoutBtn', 'micBtn', 'shopBtn', 'shopExit', 'shopClock']) {
       els[id] = document.getElementById(id);
     }
     els.sync = document.getElementById('syncState');

@@ -10,7 +10,6 @@ A self-hosted, shared shopping list. One small Node server, no dependencies, dat
 - Several at once: type `milk, eggs and bread`, or one item per line, then tap send
 - Paste a text message into the box and tap send: each item is added separately, with one Undo.
   Greetings, "can you grab…", bullets, numbering, emoji, WhatsApp timestamps and headings like `Costco:` are skipped
-- "Paste a list from a text" in the ⋯ menu shows what will be added so you can untick things first
 - Voice: tap the mic and say items with a short pause between them (Chrome, Edge, Safari)
 - Share a text to the app from Android's share menu (install it with Chrome's Install app first): it lands in the add box, tap send. Or open `/?text=milk%0Aeggs`
 - Checked items move to a hidden "Completed" section; tap it to see them and clear them

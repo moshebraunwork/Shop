@@ -119,24 +119,6 @@
     </form>
   </dialog>
 
-  <!-- Paste a list -->
-  <dialog id="bulkSheet" class="sheet" aria-labelledby="bulkTitle">
-    <form id="bulkForm" method="dialog">
-      <h2 id="bulkTitle" class="sheet-title">Paste a list</h2>
-      <label class="field">
-        <span id="bulkHint">Paste a text message or type one item per line. Commas work too.</span>
-        <textarea id="bulkText" rows="6" placeholder="Hey, can you grab:&#10;milk&#10;2 dozen eggs&#10;bread, butter and jam"></textarea>
-      </label>
-      <ul id="bulkPreview" class="bulk-preview" aria-label="Items that will be added" hidden></ul>
-      <div class="sheet-actions">
-        <button id="bulkPaste" type="button" class="btn" hidden>Paste</button>
-        <span class="spacer"></span>
-        <button type="button" class="btn" data-close>Cancel</button>
-        <button id="bulkAdd" type="submit" class="btn btn-primary" value="add" disabled>Add items</button>
-      </div>
-    </form>
-  </dialog>
-
   <!-- Lists -->
   <dialog id="listsSheet" class="sheet" aria-labelledby="listsTitle">
     <h2 id="listsTitle" class="sheet-title">Your lists</h2>
@@ -152,12 +134,8 @@
   <dialog id="menuSheet" class="sheet" aria-labelledby="menuTitle">
     <h2 id="menuTitle" class="sheet-title">Groceries</h2>
     <div class="menu">
-      <button type="button" class="menu-item" data-cmd="bulk">Paste a list from a text</button>
       <button type="button" class="menu-item" data-cmd="share">Share or copy this list</button>
-      <button type="button" class="menu-item" data-cmd="uncheck">Put completed items back on the list</button>
-      <button type="button" class="menu-item" data-cmd="clearChecked">Clear completed items</button>
       <button type="button" class="menu-item" data-cmd="rename">Rename list</button>
-      <button type="button" class="menu-item danger" data-cmd="clearAll">Remove all items</button>
       <button type="button" class="menu-item danger" data-cmd="deleteList">Delete list</button>
       <button type="button" class="menu-item" data-cmd="logout" id="logoutBtn" hidden>Sign out on this device</button>
     </div>
