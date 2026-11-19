@@ -242,7 +242,8 @@
   let outbox = store.get('sl.outbox', []);
   let view = null;
   let currentId = store.get('sl.list', null);
-  let cartOpen = store.get('sl.cartOpen', true);
+  let cartOpen = false; // completed items start hidden; tap "Completed" to see or clear them
+  let shopping = store.get('sl.shopping', false);
   let reachable = true;
   let syncing = false;
   let retryDelay = 1000;
@@ -485,8 +486,8 @@
       h('span', { class: `tick${i.checked ? ' on' : ''}`, cat: catOf(i.category).color })));
 
     if (!total) els.progressText.textContent = 'Nothing on this list yet';
-    else if (!todo.length) els.progressText.textContent = `All ${total} in the cart`;
-    else els.progressText.textContent = `${done.length} of ${total} in the cart`;
+    else if (!todo.length) els.progressText.textContent = `All ${total} done`;
+    else els.progressText.textContent = `${done.length} of ${total} done`;
 
     // To get, grouped by aisle
     const groups = CATS
@@ -505,21 +506,24 @@
       els.empty.hidden = false;
     } else if (!todo.length) {
       els.empty.replaceChildren(
-        h('strong', { text: 'Everything’s in the cart' }),
-        'Clear the cart to start fresh, or put items back to reuse this list.',
+        h('strong', { text: 'Everything’s done' }),
+        'Clear the completed items to start fresh, or put them back to reuse this list.',
         h('br'),
-        h('button', { class: 'btn btn-primary', type: 'button', 'data-cmd': 'clearChecked' }, 'Clear the cart'));
+        h('button', { class: 'btn btn-primary', type: 'button', 'data-cmd': 'clearChecked' }, 'Clear completed'));
       els.empty.hidden = false;
     } else {
       els.empty.hidden = true;
     }
 
     // In the cart
+    if (!done.length) cartOpen = false;
     els.cart.hidden = !done.length;
-    els.cartTitle.textContent = `In the cart (${done.length})`;
+    els.cartTitle.textContent = `Completed (${done.length})`;
     els.cartToggle.setAttribute('aria-expanded', String(cartOpen));
     els.cartItems.hidden = !cartOpen;
-    els.cartItems.replaceChildren(...done.map(itemRow));
+    els.cartClear.hidden = !cartOpen;
+    els.cartItems.replaceChildren(...(cartOpen ? done.map(itemRow) : []));
+    if (shopping) renderShopClock(todo.length);
 
     if (flashId) {
       const row = document.querySelector(`[data-id="${CSS.escape(flashId)}"]`);
@@ -905,14 +909,13 @@
     switch (cmd) {
       case 'bulk': return openBulk();
       case 'share': return shareList(list);
-      case 'wake': return toggleWake();
       case 'uncheck':
-        if (!list.items.some((i) => i.checked)) return toast('Nothing in the cart yet');
+        if (!list.items.some((i) => i.checked)) return toast('Nothing completed yet');
         dispatch({ type: 'uncheckAll', listId: list.id });
         return toast('Everything is back on the list');
       case 'clearChecked': {
         const n = list.items.filter((i) => i.checked).length;
-        if (!n) return toast('Nothing in the cart yet');
+        if (!n) return toast('Nothing completed yet');
         const removed = list.items.filter((i) => i.checked).map((i) => ({ ...i }));
         dispatch({ type: 'clearChecked', listId: list.id });
         return toast(`Cleared ${n} item${n === 1 ? '' : 's'}`, 'Undo', () => {
@@ -975,20 +978,76 @@
     }
   }
 
-  async function toggleWake() {
-    try {
-      if (wakeLock) { await wakeLock.release(); wakeLock = null; toast('Screen can sleep again'); }
-      else {
-        wakeLock = await navigator.wakeLock.request('screen');
-        wakeLock.addEventListener('release', () => { if (!document.hidden) wakeLock = null; updateWakeBtn(); });
-        toast('Screen will stay on while this is open');
-      }
-    } catch {
-      toast('This browser won’t keep the screen on');
+  /* ======================================================= shopping mode */
+
+  // Shopping mode: black screen with white outlines (like an always-on display), the screen stays
+  // awake, the whole row checks an item off, and nothing animates, until "Done shopping".
+  let clockTimer = null;
+
+  async function keepAwake() {
+    if (!shopping || document.hidden || wakeLock) return;
+    if (!('wakeLock' in navigator)) {
+      if (!window.isSecureContext) toast('Keeping the screen on needs the app opened over https://');
+      return;
     }
-    updateWakeBtn();
+    try {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    } catch { /* battery saver or not visible; tried again when the app is shown */ }
   }
-  function updateWakeBtn() { els.wakeBtn.setAttribute('aria-pressed', String(!!wakeLock)); }
+
+  function setShopping(on) {
+    shopping = on;
+    store.set('sl.shopping', on);
+    document.documentElement.classList.toggle('shopping', on);
+    els.shopBtn.hidden = on;
+    els.shopExit.hidden = !on;
+    els.shopClock.hidden = !on;
+    els.menuBtn.hidden = on;
+    els.sync.hidden = on;
+    els.addForm.hidden = on;
+    document.querySelectorAll('meta[name="theme-color"]').forEach((m) => {
+      if (!m.dataset.normal) m.dataset.normal = m.content;
+      m.content = on ? '#000000' : m.dataset.normal;
+    });
+    clearInterval(clockTimer);
+    if (on) {
+      cartOpen = false;
+      clockTimer = setInterval(() => renderShopClock(), 15000);
+      keepAwake();
+    } else if (wakeLock) {
+      wakeLock.release().catch(() => {});
+      wakeLock = null;
+    }
+    render();
+  }
+
+  function enterShopping() {
+    if (document.activeElement) document.activeElement.blur();
+    setShopping(true);
+    window.scrollTo({ top: 0 });
+    // Full screen hides the status and navigation bars, like the always-on display.
+    const el = document.documentElement;
+    if (el.requestFullscreen && !document.fullscreenElement) el.requestFullscreen({ navigationUI: 'hide' }).catch(() => {});
+  }
+
+  function exitShopping() {
+    setShopping(false);
+    if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
+  }
+
+  function renderShopClock(left) {
+    const now = new Date();
+    const time = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }).replace(/\s?[AP]M$/i, '');
+    if (left === undefined) {
+      const list = currentList();
+      left = list ? list.items.filter((i) => !i.checked).length : 0;
+    }
+    els.shopClock.dateTime = now.toISOString();
+    els.shopClock.replaceChildren(h('span', { class: 'clock-time', text: time }),
+      h('span', { class: 'clock-left', text: left ? `${left} left` : 'All done' }));
+  }
+
 
   /* ============================================================== events */
 
@@ -1001,7 +1060,7 @@
       const list = currentList();
       const it = list.items.find((i) => i.id === row.dataset.id);
       if (!it) return;
-      if (btn.dataset.action === 'toggle') {
+      if (btn.dataset.action === 'toggle' || shopping) {
         if (navigator.vibrate) navigator.vibrate(8);
         dispatch({ type: 'updateItem', listId: list.id, itemId: it.id, patch: { checked: !it.checked } });
       } else {
@@ -1016,10 +1075,11 @@
 
     els.cartToggle.addEventListener('click', () => {
       cartOpen = !cartOpen;
-      store.set('sl.cartOpen', cartOpen);
       render();
     });
-    els.cartClear.addEventListener('click', () => runCommand('clearChecked'));
+    els.cartClear.addEventListener('click', () => { cartOpen = false; runCommand('clearChecked'); });
+    els.shopBtn.addEventListener('click', enterShopping);
+    els.shopExit.addEventListener('click', exitShopping);
 
     // Add bar: nothing is added until you tap send.
     els.addForm.addEventListener('submit', (e) => {
@@ -1139,9 +1199,7 @@
     document.addEventListener('visibilitychange', async () => {
       if (document.hidden) return;
       refresh();
-      if (wakeLock === null && els.wakeBtn.getAttribute('aria-pressed') === 'true') {
-        try { wakeLock = await navigator.wakeLock.request('screen'); } catch { /* ignore */ }
-      }
+      if (shopping) { renderShopClock(); keepAwake(); }
     });
     window.addEventListener('online', () => { refresh(); flushOutbox(); });
     window.addEventListener('offline', () => setReachable(false));
@@ -1213,14 +1271,13 @@
     for (const id of ['app', 'boot', 'login', 'main', 'toGet', 'empty', 'cart', 'cartToggle', 'cartTitle', 'cartClear',
       'cartItems', 'strip', 'progressText', 'listName', 'listSwitch', 'menuBtn', 'offline', 'addForm', 'addInput',
       'itemSheet', 'listsSheet', 'listsList', 'menuSheet', 'askSheet', 'toast', 'toastText',
-      'toastAction', 'wakeBtn', 'logoutBtn', 'bulkSheet', 'micBtn']) {
+      'toastAction', 'logoutBtn', 'bulkSheet', 'micBtn', 'shopBtn', 'shopExit', 'shopClock']) {
       els[id] = document.getElementById(id);
     }
     els.sync = document.getElementById('syncState');
-    els.wakeBtn.hidden = !('wakeLock' in navigator);
-    updateWakeBtn();
     bind();
     bindLogin();
+    if (shopping) setShopping(true);
     start();
 
     if ('serviceWorker' in navigator && window.isSecureContext) {
