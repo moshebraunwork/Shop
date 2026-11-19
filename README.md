@@ -46,6 +46,18 @@ APP_PASSWORD=yourpassword node server.js
 | `TRUST_PROXY` | off | Set to `1` behind Caddy/nginx/Cloudflare so rate limiting and secure cookies use the real client |
 | `COOKIE_SECURE` | off | Set to `1` to always mark the cookie Secure |
 
+## Updating
+
+On the server, from the folder you cloned:
+
+```bash
+~/apps/shop/update.sh
+```
+
+It pulls the latest version from GitHub, rebuilds the container and waits until it's healthy.
+Your list is in a Docker volume and isn't touched. Edits you made on the server (port, password
+in `docker-compose.yml`) are kept. `FORCE=1 ./update.sh` rebuilds even when there's nothing new.
+
 ## HTTPS (needed for install + offline)
 
 Browsers only allow home-screen install, offline caching and keep-screen-on over HTTPS. With Caddy:
