@@ -67,9 +67,9 @@
       <ul id="suggestions" class="suggestions" role="listbox" aria-label="Suggestions" hidden></ul>
       <div class="add-row">
         <label for="addInput" class="sr-only">Add an item</label>
-        <input id="addInput" type="text" enterkeyhint="done" maxlength="160"
+        <textarea id="addInput" rows="1" enterkeyhint="done" maxlength="5000" autocapitalize="sentences"
                placeholder="Add milk, eggs, bread…"
-               role="combobox" aria-autocomplete="list" aria-controls="suggestions" aria-expanded="false">
+               role="combobox" aria-autocomplete="list" aria-controls="suggestions" aria-expanded="false"></textarea>
         <button id="micBtn" class="mic-btn" type="button" aria-label="Add items by voice" aria-pressed="false" hidden>
           <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
         </button>
