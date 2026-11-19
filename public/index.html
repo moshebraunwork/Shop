@@ -38,6 +38,12 @@
           <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
         <span id="syncState" class="sync" role="status"></span>
+        <time id="shopClock" class="shop-clock" hidden></time>
+        <button id="shopBtn" class="shop-btn" type="button" aria-label="Start shopping mode">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M3 4h2.2l2.1 10.2a1.5 1.5 0 0 0 1.5 1.2h8.3a1.5 1.5 0 0 0 1.5-1.1L20.2 8H6.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9.5" cy="19.5" r="1.4" fill="currentColor"/><circle cx="17" cy="19.5" r="1.4" fill="currentColor"/></svg>
+          <span>Shop</span>
+        </button>
+        <button id="shopExit" class="shop-exit" type="button" hidden>Done shopping</button>
         <button id="menuBtn" class="icon-btn" type="button" aria-label="List options" aria-haspopup="dialog">
           <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
         </button>
@@ -53,28 +59,26 @@
       <div id="empty" class="empty" hidden></div>
       <section id="cart" class="cart" hidden>
         <div class="cart-head">
-          <button id="cartToggle" class="cart-toggle" type="button" aria-expanded="true">
+          <button id="cartToggle" class="cart-toggle" type="button" aria-expanded="false" aria-controls="cartItems">
             <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            <span id="cartTitle">In the cart</span>
+            <span id="cartTitle">Completed</span>
           </button>
-          <button id="cartClear" class="link-btn" type="button">Clear</button>
+          <button id="cartClear" class="link-btn" type="button" hidden>Clear completed</button>
         </div>
         <ul id="cartItems" class="rows rows-done"></ul>
       </section>
     </main>
 
     <form id="addForm" class="add-bar" autocomplete="off">
-      <ul id="suggestions" class="suggestions" role="listbox" aria-label="Suggestions" hidden></ul>
       <div class="add-row">
         <label for="addInput" class="sr-only">Add an item</label>
-        <textarea id="addInput" rows="1" enterkeyhint="done" maxlength="5000" autocapitalize="sentences"
-               placeholder="Add milk, eggs, bread…"
-               role="combobox" aria-autocomplete="list" aria-controls="suggestions" aria-expanded="false"></textarea>
+        <textarea id="addInput" rows="1" enterkeyhint="enter" maxlength="5000" autocapitalize="sentences"
+               placeholder="Add milk, eggs, bread…"></textarea>
         <button id="micBtn" class="mic-btn" type="button" aria-label="Add items by voice" aria-pressed="false" hidden>
           <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
         </button>
-        <button class="add-btn" type="submit" aria-label="Add item">
-          <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>
+        <button class="add-btn" type="submit" aria-label="Add to list">
+          <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M4.5 12.5 19.5 5l-4.2 14.5-3.6-5.6L4.5 12.5Z M11.7 13.9 19.5 5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/></svg>
         </button>
       </div>
     </form>
@@ -152,9 +156,8 @@
     <div class="menu">
       <button type="button" class="menu-item" data-cmd="bulk">Paste a list from a text</button>
       <button type="button" class="menu-item" data-cmd="share">Share or copy this list</button>
-      <button type="button" class="menu-item" data-cmd="wake" id="wakeBtn" hidden>Keep screen on while shopping</button>
-      <button type="button" class="menu-item" data-cmd="uncheck">Put everything back on the list</button>
-      <button type="button" class="menu-item" data-cmd="clearChecked">Clear items in the cart</button>
+      <button type="button" class="menu-item" data-cmd="uncheck">Put completed items back on the list</button>
+      <button type="button" class="menu-item" data-cmd="clearChecked">Clear completed items</button>
       <button type="button" class="menu-item" data-cmd="rename">Rename list</button>
       <button type="button" class="menu-item danger" data-cmd="clearAll">Remove all items</button>
       <button type="button" class="menu-item danger" data-cmd="deleteList">Delete list</button>
