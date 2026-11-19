@@ -479,13 +479,6 @@
     const done = list.items.filter((i) => i.checked).sort((a, b) => (b.checkedAt || 0) - (a.checkedAt || 0));
     const total = list.items.length;
 
-    // Aisle strip
-    const ordered = [...list.items].sort((a, b) =>
-      CATS.indexOf(catOf(a.category)) - CATS.indexOf(catOf(b.category)) || a.createdAt - b.createdAt);
-    els.strip.replaceChildren(...ordered.map((i) =>
-      h('span', { class: `tick${i.checked ? ' on' : ''}`, cat: catOf(i.category).color })));
-
-
     // To get, grouped by aisle
     const groups = CATS
       .map((c) => ({ c, items: todo.filter((i) => catOf(i.category).id === c.id) }))
@@ -1268,7 +1261,7 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     for (const id of ['app', 'boot', 'login', 'main', 'toGet', 'empty', 'cart', 'cartToggle', 'cartTitle', 'cartClear',
-      'cartItems', 'strip', 'listName', 'listSwitch', 'menuBtn', 'offline', 'addForm', 'addInput',
+      'cartItems', 'listName', 'listSwitch', 'menuBtn', 'offline', 'addForm', 'addInput',
       'itemSheet', 'listsSheet', 'listsList', 'menuSheet', 'askSheet', 'toast', 'toastText',
       'toastAction', 'logoutBtn', 'bulkSheet', 'micBtn', 'shopBtn', 'shopExit', 'shopClock']) {
       els[id] = document.getElementById(id);

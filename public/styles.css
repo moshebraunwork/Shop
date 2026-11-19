@@ -125,24 +125,6 @@ button { cursor: pointer; background: none; border: 0; padding: 0; }
 .sync[data-state="pending"]::before { background: var(--accent); }
 .sync[data-state="offline"]::before { background: var(--muted); }
 
-/* The aisle strip: one tick per item, colored by aisle, solid once it's in the cart */
-.strip {
-  display: flex;
-  gap: 3px;
-  height: 10px;
-  margin: 12px 0 4px;
-}
-.tick {
-  flex: 1 1 0;
-  min-width: 2px;
-  max-width: 28px;
-  border-radius: 3px;
-  background: var(--cat);
-  opacity: 0.22;
-  transition: opacity 0.25s ease;
-}
-.tick.on { opacity: 1; }
-.strip:empty { background: var(--sunk); border-radius: 3px; }
 
 
 .banner {
@@ -326,7 +308,7 @@ button { cursor: pointer; background: none; border: 0; padding: 0; }
   font-weight: 700;
   white-space: nowrap;
 }
-.shopping .strip, .shopping .add-bar { display: none; }
+.shopping .add-bar { display: none; }
 .shopping .main { padding-bottom: calc(40px + env(safe-area-inset-bottom, 0px)); }
 .shopping .aisle-head { color: var(--muted); font-weight: 400; letter-spacing: 0.04em; text-transform: uppercase; font-size: 0.82rem; }
 .shopping .aisle-head::before { background: none; border: 1.5px solid #fff; border-radius: 50%; width: 8px; height: 8px; }
