@@ -48,6 +48,25 @@ if [ "$stashed" = 1 ] && ! git stash pop --quiet 2>/dev/null; then
   echo "   Kept your version. Compare with the new one using: git diff origin/$branch -- $conflicted"
 fi
 
+config="$(docker compose config)"
+if grep -qE 'APP_PASSWORD: "?change-me"?$' <<<"$config"; then
+  echo "!! The password is still 'change-me'. Put your own in .env first:" >&2
+  echo "     cp .env.example .env && nano .env" >&2
+  echo "   The code is updated; run FORCE=1 $0 to restart once .env is set." >&2
+  exit 1
+fi
+
+# A container with the same name that compose didn't start (e.g. an older "docker run")
+# would block the restart. Replace it; the list is in the data volume, not the container.
+name="$(sed -n 's/^ *container_name: *"\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' <<<"$config" | head -n1)"
+if [ -n "$name" ] && docker container inspect "$name" >/dev/null 2>&1; then
+  owner="$(docker container inspect --format '{{index .Config.Labels "com.docker.compose.project"}}' "$name")"
+  if [ -z "$owner" ]; then
+    echo "==> Replacing the manually started '$name' container with the compose one"
+    docker rm -f "$name" >/dev/null
+  fi
+fi
+
 echo "==> Rebuilding and restarting"
 docker compose up -d --build --remove-orphans
 docker image prune -f >/dev/null 2>&1 || true
