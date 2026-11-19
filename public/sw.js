@@ -1,6 +1,6 @@
 // Keeps the app shell available offline. List data is never cached here;
 // the app keeps its own copy and an outbox of unsynced changes.
-const CACHE = 'shopping-list-v7';
+const CACHE = 'shopping-list-v9';
 const SHELL = ['./', 'index.html', 'app.js', 'styles.css', 'manifest.webmanifest', 'icon.svg',
   'icon-192.png', 'icon-512.png', 'icon-maskable.png', 'fonts/atkinson-400.woff2', 'fonts/atkinson-700.woff2'];
 
