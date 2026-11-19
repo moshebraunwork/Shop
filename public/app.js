@@ -501,9 +501,7 @@
     if (!total) {
       els.empty.replaceChildren(
         h('strong', { text: 'This list is empty' }),
-        'Add what you need below. Items sort themselves into aisles. Type “2 avocados”, or “milk, eggs, bread” for several at once.',
-        h('br'),
-        h('button', { class: 'btn btn-primary', type: 'button', 'data-cmd': 'bulk' }, 'Paste a list from a text'));
+        'Type or paste what you need below, one item per line or separated by commas, then tap send. Items sort themselves into aisles.');
       els.empty.hidden = false;
     } else if (!todo.length) {
       els.empty.replaceChildren(
@@ -756,7 +754,6 @@
       toast('Voice input isn’t available right now');
       return;
     }
-    hideSuggestions();
     els.micBtn.setAttribute('aria-pressed', 'true');
     els.addInput.placeholder = 'Listening… pause between items';
   }
@@ -770,62 +767,7 @@
     if (text) openBulk(text);
   }
 
-  /* ========================================================= suggestions */
-
-  let suggItems = [];
-  let suggIndex = -1;
-
-  function updateSuggestions() {
-    const list = currentList();
-    if (!list || !view) return;
-    sizeAddBox();
-    const q = els.addInput.value.trim().toLowerCase();
-    const onList = new Set(list.items.filter((i) => !i.checked).map((i) => keyOf(i.name)));
-    const pool = view.history.filter((x) => !onList.has(x.key));
-    let label;
-    if (!q) {
-      suggItems = pool.slice().sort((a, b) => b.count - a.count || b.lastUsed - a.lastUsed).slice(0, 6);
-      label = 'You often buy';
-    } else {
-      const parsed = parseEntry(q).name.toLowerCase();
-      const term = parsed || q;
-      suggItems = pool
-        .map((x) => {
-          const n = x.key;
-          let score = 0;
-          if (n.startsWith(term)) score = 3;
-          else if (n.includes(` ${term}`)) score = 2;
-          else if (n.includes(term)) score = 1;
-          return { x, score };
-        })
-        .filter((r) => r.score && r.x.key !== term)
-        .sort((a, b) => b.score - a.score || b.x.count - a.x.count)
-        .slice(0, 6)
-        .map((r) => r.x);
-      label = null;
-    }
-    suggIndex = -1;
-    if (document.activeElement !== els.addInput || recog || (!suggItems.length && q)) {
-      hideSuggestions();
-      return;
-    }
-    const kids = [];
-    if (!q) {
-      kids.push(h('li', { class: 'sugg-actions', role: 'presentation' },
-        h('button', { class: 'chip-btn', type: 'button', tabindex: '-1', 'data-bulk': '' }, 'Paste or type a whole list')));
-    }
-    if (label && suggItems.length) kids.push(h('li', { class: 'sugg-label', role: 'presentation', text: label }));
-    suggItems.forEach((x, i) => {
-      const c = catOf(x.category);
-      kids.push(h('li', { class: 'sugg', role: 'option', id: `sugg-${i}`, 'aria-selected': 'false', cat: c.color },
-        h('button', { class: 'sugg-pick', type: 'button', tabindex: '-1', 'data-pick': String(i) },
-          x.name, h('span', { class: 'sugg-meta', text: c.label })),
-        h('button', { class: 'sugg-forget', type: 'button', tabindex: '-1', 'data-forget': String(i), 'aria-label': `Stop suggesting ${x.name}` }, '×')));
-    });
-    els.suggestions.replaceChildren(...kids);
-    els.suggestions.hidden = false;
-    els.addInput.setAttribute('aria-expanded', 'true');
-  }
+  /* ============================================================ add box */
 
   // The add box is a textarea so pasted line breaks survive however the text arrives
   // (keyboard clipboard buttons don't always send a paste event). It grows with its content.
@@ -835,29 +777,9 @@
     if (el.value.includes('\n') || el.scrollHeight > el.clientHeight + 2) el.style.height = `${el.scrollHeight + 4}px`;
   }
 
-  function hideSuggestions() {
-    els.suggestions.hidden = true;
-    els.addInput.setAttribute('aria-expanded', 'false');
-    els.addInput.removeAttribute('aria-activedescendant');
-    suggIndex = -1;
-  }
-
-  function highlight(i) {
-    suggIndex = i;
-    els.suggestions.querySelectorAll('.sugg').forEach((el, j) => el.setAttribute('aria-selected', String(j === i)));
-    if (i >= 0) els.addInput.setAttribute('aria-activedescendant', `sugg-${i}`);
-    else els.addInput.removeAttribute('aria-activedescendant');
-  }
-
-  function pickSuggestion(i) {
-    const x = suggItems[i];
-    if (!x) return;
-    const { qty } = parseEntry(els.addInput.value);
-    addByName(qty ? `${qty} ${x.name}` : x.name);
-    els.addInput.value = '';
-    updateSuggestions();
-    els.addInput.focus();
-  }
+  // Phones: Enter starts a new line, so you can type a list one item per line; the send button adds.
+  // Computers: Enter adds, Shift+Enter starts a new line.
+  const enterSends = () => window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches;
 
   /* ========================================================== edit sheet */
 
@@ -921,7 +843,6 @@
   /* ============================================================== sheets */
 
   function openSheet(dlg) {
-    hideSuggestions();
     if (typeof dlg.showModal === 'function') dlg.showModal();
     else dlg.setAttribute('open', '');
   }
@@ -1005,7 +926,7 @@
       }
       case 'clearAll': {
         if (!list.items.length) return toast('This list is already empty');
-        const okay = await ask({ title: `Remove all ${list.items.length} items?`, body: `Everything on “${list.name}” will be removed. Suggestions are kept.`, ok: 'Remove all', danger: true });
+        const okay = await ask({ title: `Remove all ${list.items.length} items?`, body: `Everything on “${list.name}” will be removed.`, ok: 'Remove all', danger: true });
         if (okay) dispatch({ type: 'clearAll', listId: list.id });
         return undefined;
       }
@@ -1100,74 +1021,28 @@
     });
     els.cartClear.addEventListener('click', () => runCommand('clearChecked'));
 
-    // Add bar
+    // Add bar: nothing is added until you tap send.
     els.addForm.addEventListener('submit', (e) => {
       e.preventDefault();
-      if (suggIndex >= 0) return pickSuggestion(suggIndex);
       const v = els.addInput.value;
-      if (!v.trim()) return undefined;
+      if (!v.trim()) { els.addInput.focus(); return; }
       addText(v);
       els.addInput.value = '';
-      updateSuggestions();
+      sizeAddBox();
       els.addInput.focus();
-      return undefined;
     });
-    els.addInput.addEventListener('input', (e) => {
-      const v = els.addInput.value;
-      if (v.includes('\n')) {
-        if (e.inputType === 'insertLineBreak' || e.inputType === 'insertParagraph' || /^[^\n]*\n$/.test(v)) {
-          // Enter on a keyboard that didn't send a keydown: treat it as Add.
-          els.addInput.value = v.replace(/\n/g, ' ').trim();
-          els.addForm.requestSubmit();
-          return;
-        }
-        const entries = splitList(v);
-        if (entries.length > 1) {
-          addMany(entries);
-          els.addInput.value = '';
-        }
-      }
-      updateSuggestions();
-    });
-    els.addInput.addEventListener('focus', updateSuggestions);
-    els.addInput.addEventListener('blur', () => setTimeout(() => {
-      if (!els.addForm.contains(document.activeElement)) hideSuggestions();
-    }, 150));
+    els.addInput.addEventListener('input', sizeAddBox);
     els.addInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+      if (e.key !== 'Enter' || e.isComposing) return;
+      if ((enterSends() && !e.shiftKey) || e.ctrlKey || e.metaKey) {
         e.preventDefault();
         els.addForm.requestSubmit();
-        return;
-      }
-      if (els.suggestions.hidden) return;
-      if (e.key === 'ArrowDown') { e.preventDefault(); highlight(Math.min(suggIndex + 1, suggItems.length - 1)); }
-      else if (e.key === 'ArrowUp') { e.preventDefault(); highlight(Math.max(suggIndex - 1, -1)); }
-      else if (e.key === 'Escape') hideSuggestions();
-    });
-    els.addInput.addEventListener('paste', (e) => {
-      const text = (e.clipboardData || window.clipboardData).getData('text');
-      // Anything that looks like a list goes in straight away (one Undo takes it all back).
-      // A single item pastes into the box as usual so it can be edited first.
-      const entries = splitList(text);
-      if (entries.length > 1) {
-        e.preventDefault();
-        addMany(entries);
-        els.addInput.value = '';
-        updateSuggestions();
       }
     });
-    els.suggestions.addEventListener('pointerdown', (e) => e.preventDefault()); // keep the keyboard open
-    els.suggestions.addEventListener('click', (e) => {
-      if (e.target.closest('[data-bulk]')) { els.addInput.blur(); openBulk(); return; }
-      const pick = e.target.closest('[data-pick]');
-      const forget = e.target.closest('[data-forget]');
-      if (pick) pickSuggestion(Number(pick.dataset.pick));
-      else if (forget) {
-        const x = suggItems[Number(forget.dataset.forget)];
-        if (x) dispatch({ type: 'forget', key: x.key });
-        updateSuggestions();
-      }
-    });
+    // Keep the keyboard open when tapping send or the mic.
+    els.addForm.querySelectorAll('button').forEach((b) => b.addEventListener('pointerdown', (e) => {
+      if (document.activeElement === els.addInput) e.preventDefault();
+    }));
 
     // Voice
     els.addInput.dataset.placeholder = els.addInput.placeholder;
@@ -1337,7 +1212,7 @@
   document.addEventListener('DOMContentLoaded', () => {
     for (const id of ['app', 'boot', 'login', 'main', 'toGet', 'empty', 'cart', 'cartToggle', 'cartTitle', 'cartClear',
       'cartItems', 'strip', 'progressText', 'listName', 'listSwitch', 'menuBtn', 'offline', 'addForm', 'addInput',
-      'suggestions', 'itemSheet', 'listsSheet', 'listsList', 'menuSheet', 'askSheet', 'toast', 'toastText',
+      'itemSheet', 'listsSheet', 'listsList', 'menuSheet', 'askSheet', 'toast', 'toastText',
       'toastAction', 'wakeBtn', 'logoutBtn', 'bulkSheet', 'micBtn']) {
       els[id] = document.getElementById(id);
     }

@@ -7,13 +7,12 @@ A self-hosted, shared shopping list. One small Node server, no dependencies, dat
 - Several lists (Groceries, Costco, Pharmacy…), switch from the title
 - Items sort themselves into aisles; correct an aisle once and it's remembered
 - Type naturally: `2 avocados`, `2 lb ground beef`, `milk x2`, `a dozen eggs`
-- Several at once: type `milk, eggs and bread` and press Enter
-- Paste a text message straight into the box: each item is added separately, with one Undo.
+- Several at once: type `milk, eggs and bread`, or one item per line, then tap send
+- Paste a text message into the box and tap send: each item is added separately, with one Undo.
   Greetings, "can you grab…", bullets, numbering, emoji, WhatsApp timestamps and headings like `Costco:` are skipped
-- "Paste a list" sheet (in the ⋯ menu, or tap the empty add box) shows what will be added so you can untick things first
+- "Paste a list from a text" in the ⋯ menu shows what will be added so you can untick things first
 - Voice: tap the mic and say items with a short pause between them (Chrome, Edge, Safari)
 - Share a text to the app from Android's share menu once it's installed, or open `/?text=milk%0Aeggs`
-- Suggestions from what you've bought before, frequent items when the box is empty
 - Checked items move to "In the cart"; clear it, or put everything back to reuse a list
 - Edit quantity, aisle, note, or move an item to another list; undo after deleting
 - Live sync between phones (changes appear instantly on every open device)

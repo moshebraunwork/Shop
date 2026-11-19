@@ -311,40 +311,6 @@ button { cursor: pointer; background: none; border: 0; padding: 0; }
 }
 .add-btn:active { transform: scale(0.94); }
 
-.suggestions {
-  list-style: none;
-  margin: 0 0 8px;
-  padding: 0;
-  max-height: 46vh;
-  overflow-y: auto;
-}
-.sugg-label { font-size: 0.85rem; color: var(--muted); padding: 4px 8px; }
-.sugg {
-  display: flex;
-  align-items: center;
-  border-radius: 12px;
-}
-.sugg[aria-selected="true"], .sugg:hover { background: var(--sunk); }
-.sugg-pick {
-  flex: 1;
-  display: flex; align-items: center; gap: 10px;
-  min-height: 46px;
-  padding: 0 10px;
-  text-align: left;
-}
-.sugg-pick::before {
-  content: "";
-  width: 10px; height: 10px; border-radius: 3px;
-  background: var(--cat);
-  flex: none;
-}
-.sugg-meta { margin-left: auto; font-size: 0.85rem; color: var(--muted); }
-.sugg-forget {
-  width: 44px; height: 46px;
-  color: var(--muted);
-  font-size: 1.2rem;
-}
-
 .mic-btn {
   flex: none;
   width: 54px; height: 54px;
@@ -359,17 +325,6 @@ button { cursor: pointer; background: none; border: 0; padding: 0; }
   animation: listen 1.2s ease-in-out infinite;
 }
 @keyframes listen { 50% { box-shadow: 0 0 0 8px color-mix(in srgb, var(--danger) 25%, transparent); } }
-
-.sugg-actions { padding: 2px 0 6px; }
-.chip-btn {
-  min-height: 40px;
-  padding: 0 16px;
-  border-radius: 20px;
-  border: 2px dashed var(--line);
-  font-weight: 700;
-  font-size: 0.95rem;
-}
-.chip-btn:hover { background: var(--sunk); }
 
 .bulk-preview {
   list-style: none;
