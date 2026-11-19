@@ -39,8 +39,26 @@
     for (const w of words.split(',')) GUESS.push([w.trim(), cat]);
   }
 
-  const UNITS = 'kg|g|lb|lbs|oz|l|ml|pack|packs|pk|bag|bags|box|boxes|can|cans|bottle|bottles|dozen|doz|bunch|bunches|jar|jars|ct|loaf|loaves|carton|cartons';
-  const LEAD_QTY = new RegExp(`^(\\d+(?:[.,]\\d+)?|½|¼|¾)\\s*(?:x|×)?\\s*(?:(${UNITS})\\.?\\s+)?(.+)$`, 'i');
+  const UNITS = 'kg|kgs|kilo|kilos|g|grams?|lb|lbs|pounds?|oz|ounces?|l|liters?|litres?|ml|gal|gallons?|qt|quarts?|pack|packs|packets?|pk|bag|bags|box|boxes|can|cans|bottle|bottles|dozen|doz|bunch|bunches|jar|jars|ct|loaf|loaves|carton|cartons|heads?|cases?|rolls?|tubs?|containers?|sticks?|pints?|slices?';
+  const LEAD_QTY = new RegExp(`^(\\d+(?:[.,/]\\d+)?|½|¼|¾)\\s*(?:x|×)?\\s*(?:(${UNITS})\\.?\\s+(?:of\\s+)?)?(.+)$`, 'i');
+  const NUM_WORDS = {
+    a: '1', an: '1', one: '1', two: '2', three: '3', four: '4', five: '5', six: '6', seven: '7', eight: '8',
+    nine: '9', ten: '10', eleven: '11', twelve: '12', 'a couple of': '2', 'a couple': '2', couple: '2', 'a few': '3',
+    half: '½', 'a half': '½', 'half a': '½',
+  };
+  const NUM_WORD_RE = new RegExp(`^(${Object.keys(NUM_WORDS).sort((a, b) => b.length - a.length).join('|')})\\s+(?=\\S)`, 'i');
+
+  // Words that make up "Hi!", "Thanks love you", "That's all" lines in a text message. A line made only of these is skipped.
+  const CHATTER = new Set(('hi hey hello hiya yo ok okay k thanks thank you thx ty tysm love u ily luv xo xox xoxo xx bye ' +
+    'please pls plz yes yeah yep no nope sure cool great perfect awesome lol haha babe hon honey dear sweetie mom dad ' +
+    'that thats that\'s it all is everything for now me today tonight just the list here heres here\'s shopping grocery groceries ' +
+    'and also too oh sent from my iphone android').split(' '));
+  // "Can you pick up", "We need", "Don't forget" at the start of a line.
+  const ASK_PREFIX = /^(?:(?:hi|hey|hello|ok|okay|also|and|oh|so|plus)\b[\s,!.]*)*(?:(?:can|could|would|will)\s+(?:you|u)\s+(?:please\s+|pls\s+|plz\s+)?(?:also\s+)?(?:get|grab|pick\s+up|buy|bring(?:\s+home)?)(?:\s+(?:me|us))?|(?:please|pls|plz)\s+(?:also\s+)?(?:get|grab|pick\s+up|buy|bring)(?:\s+(?:me|us))?|(?:we|i)\s+(?:also\s+)?(?:need|want|are\s+out\s+of|ran\s+out\s+of|'re\s+out\s+of)|we're\s+out\s+of|(?:also\s+)?need|don'?t\s+forget(?:\s+(?:to\s+get|the))?|remember(?:\s+to\s+get)?|(?:also\s+)?(?:grab|pick\s+up|buy)|out\s+of|get\s+(?:me|us))\b[\s:,-]*/i;
+  const TRAILING_CHATTER = /[\s,.!?]*(?:\b(?:please|pls|plz|thanks|thank\s+you|thx|ty|too|also|as\s+well|if\s+you\s+can|for\s+me|for\s+us)\b[\s,.!?]*)*$/i;
+  // WhatsApp / Telegram copy: "[11/19/26, 3:42:10 PM] Mom: milk" or "11/19/26, 3:42 PM - Mom: milk"
+  const CHAT_STAMP = /^\[?\d{1,4}[/.-]\d{1,2}[/.-]\d{1,4},?\s+\d{1,2}:\d{2}(?::\d{2})?\s*(?:[ap]\.?\s?m\.?)?\]?\s*(?:-\s*)?(?:[^:]{1,40}:\s*)?/i;
+  const BULLET = /^(?:[\s\-–—*•·▪◦‣○●□■☐☑✓✔✗>~=+]|\[[ xX✓]?\]|#?\d{1,2}\s*[.):]\s+|#\d{1,2}\s+)+/;
 
   /* ============================================================== helpers */
 
@@ -103,21 +121,102 @@
   }
 
   function parseEntry(raw) {
-    let s = raw.trim()
-      .replace(/^(?:[-*•·]|\[[ xX]?\]|\d+[.)])\s+/, '')
-      .trim();
+    let s = raw.trim().replace(BULLET, '').trim();
     let qty = '';
-    let m = s.match(LEAD_QTY);
-    if (m && m[3] && /[a-z\u00c0-\u024f]/i.test(m[3][0])) {
+    let m;
+    // "two avocados", "a dozen eggs", "a couple of lemons", "an onion"
+    if ((m = s.match(NUM_WORD_RE))) {
+      const rest = s.slice(m[0].length);
+      const n = NUM_WORDS[m[1].toLowerCase()];
+      // A bare "a"/"an" is just an article: "an onion" is one onion, no quantity needed.
+      s = /^an?$/i.test(m[1]) && !new RegExp(`^(?:${UNITS})\\b`, 'i').test(rest) ? rest : `${n} ${rest}`;
+    }
+    s = s.replace(/^(?:some|more|extra|another)\s+(?=\S)/i, '');
+    m = s.match(LEAD_QTY);
+    if (m && m[3] && /[a-zÀ-ɏ]/i.test(m[3][0])) {
       qty = m[2] ? `${m[1]} ${m[2].toLowerCase()}` : m[1];
       s = m[3];
-    } else if ((m = s.match(/^(.+?)\s+[x×]\s*(\d+)$/i)) || (m = s.match(/^(.+?)\s*\((\d+[^)]*)\)$/))) {
+    } else if ((m = s.match(/^(.+?)\s*(?:[x×]\s*|[-–:]\s+|\*\s*)(\d+(?:[.,]\d+)?(?:\s*(?:[a-z]+))?)$/i))
+      || (m = s.match(/^(.+?)\s*\((\d+[^)]*)\)$/))) {
       s = m[1];
       qty = m[2];
     }
-    s = s.replace(/\s+/g, ' ').trim();
+    if (qty === '1') qty = '';
+    s = s.replace(/^(?:of)\s+/i, '').replace(/[\s.,;:!?-]+$/, '').replace(/\s+/g, ' ').trim();
     if (s) s = s[0].toLocaleUpperCase() + s.slice(1);
     return { name: s.slice(0, 120), qty: qty.slice(0, 40) };
+  }
+
+  function isChatter(line) {
+    const words = line.toLowerCase().replace(/[^a-z'\s]+/g, ' ').trim().split(/\s+/).filter(Boolean);
+    return !words.length || words.every((w) => CHATTER.has(w));
+  }
+
+  // Phrases about the trip rather than things to buy: "a few things on the way home?"
+  const NOT_AN_ITEM = /\b(?:things|stuff|a few items|on (?:the|your) way|when you(?:'re| are)?|if you(?:'re| are)? (?:going|at|near)|while you(?:'re| are)|at the store|to the store|from the store|shopping list|list for|here(?:'s| is) the list)\b/i;
+  // Pairs that are one product, so "and" is not a separator inside them.
+  const COMPOUNDS = /\b(mac|macaroni|salt|bread|fish|ham|peanut butter|pb|half|sweet|oil|cookies|black|rock|surf|cheese|pork|rice|chips|spaghetti|franks|biscuits|gravy|eggs|bacon|chicken|beans)\s+(and|&|n|'n'?)\s+(cheese|pepper|butter|chips|jelly|jam|half|sour|vinegar|cream|white|roll|turf|onion|crackers|beans|salsa|meatballs|gravy|waffles|biscuits|rice|dumplings|franks)\b/gi;
+
+  function cleanPiece(piece) {
+    let s = piece.trim().replace(BULLET, '').trim();
+    let asked = false;
+    for (let i = 0; i < 3; i += 1) { // "Hey! Can you also pick up" peels in a few passes
+      const before = s;
+      s = s.replace(ASK_PREFIX, (m) => { if (m) asked = true; return ''; })
+        .replace(/^(?:and|or|also|plus|then)\s+/i, '').trim();
+      if (s === before) break;
+    }
+    s = s.replace(TRAILING_CHATTER, '').replace(/[?!.]+$/, '').trim();
+    if (isChatter(s) || NOT_AN_ITEM.test(s)) s = '';
+    return { text: s, asked };
+  }
+
+  /**
+   * Turn pasted text, a typed line or a voice transcript into separate entries.
+   * Handles one-per-line lists, "milk, eggs and bread", bullets, numbering, emoji,
+   * chat timestamps, "Costco:" headings and the chit-chat around a texted list.
+   */
+  function splitList(text, { voice = false } = {}) {
+    const out = [];
+    const seen = new Set();
+    const lines = String(text || '')
+      .replace(/[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}\uFE0F\u200D\u20E3]/gu, ' ')
+      .split(/\r?\n|\u2028|\u2029/);
+    for (let line of lines) {
+      line = line.replace(CHAT_STAMP, '').replace(/\s+/g, ' ').trim();
+      if (!line) continue;
+      // Sentences: "Hi! Can you get milk." -> handle each sentence on its own
+      const sentences = line.split(/(?<=[a-z)][!?.])\s+(?=[A-Z])/);
+      for (let sentence of sentences) {
+        // "Costco: milk, eggs" keeps what follows; a bare "Produce:" heading is skipped
+        const head = sentence.match(/^([^:,\d]{1,40}):\s*(.*)$/);
+        if (head) {
+          if (!head[2].trim()) continue;
+          sentence = head[2];
+        }
+        const { text: body, asked } = cleanPiece(sentence);
+        if (!body) continue;
+        const protectedBody = body.replace(COMPOUNDS, '$1\u0001$2\u0001$3');
+        let parts = protectedBody.split(/\s*;\s*|,(?!\d)\s*|\s+\|\s+/);
+        // "milk, eggs and bread" or "we're out of coffee and sugar" -> split the "and" too.
+        // A plain line like "mac and cheese" or "chips and dip" stays whole, except for voice,
+        // where there is no punctuation to go by.
+        if (parts.length > 1 || asked || voice) {
+          parts = parts.flatMap((p) => p.split(/\s+(?:and|plus|then|also|comma)\s+|\s+&\s+(?=\S+\s*$)/i));
+        }
+        for (const part of parts) {
+          const cleaned = cleanPiece(part.replace(/\u0001/g, ' ')).text;
+          if (!cleaned) continue;
+          const { name } = parseEntry(cleaned);
+          if (!name || !/[\p{L}\p{N}]/u.test(name)) continue;
+          const key = keyOf(name);
+          if (seen.has(key)) continue;
+          seen.add(key);
+          out.push(cleaned);
+        }
+      }
+    }
+    return out;
   }
 
   function bumpQty(qty, delta) {
@@ -398,7 +497,9 @@
     if (!total) {
       els.empty.replaceChildren(
         h('strong', { text: 'This list is empty' }),
-        'Add what you need below. Items sort themselves into aisles, and you can type “2 avocados” or paste a whole list.');
+        'Add what you need below. Items sort themselves into aisles. Type “2 avocados”, or “milk, eggs, bread” for several at once.',
+        h('br'),
+        h('button', { class: 'btn btn-primary', type: 'button', 'data-cmd': 'bulk' }, 'Paste a list from a text'));
       els.empty.hidden = false;
     } else if (!todo.length) {
       els.empty.replaceChildren(
@@ -493,13 +594,16 @@
         if (qty) patch.qty = qty;
         dispatch({ type: 'updateItem', listId: list.id, itemId: existing.id, patch });
         if (!opts.quiet) toast(`${existing.name} is back on the list`);
-      } else {
-        if (qty && qty !== existing.qty) dispatch({ type: 'updateItem', listId: list.id, itemId: existing.id, patch: { qty } });
-        if (!opts.quiet) toast(qty && qty !== existing.qty ? `Updated ${existing.name} to ${qty}` : `${existing.name} is already on the list`);
+        flashId = existing.id;
+        render();
+        return { id: existing.id, status: 'restored', prevQty: existing.qty };
       }
+      const changed = qty && qty !== existing.qty;
+      if (changed) dispatch({ type: 'updateItem', listId: list.id, itemId: existing.id, patch: { qty } });
+      if (!opts.quiet) toast(changed ? `Updated ${existing.name} to ${qty}` : `${existing.name} is already on the list`);
       flashId = existing.id;
       render();
-      return existing.id;
+      return { id: existing.id, status: changed ? 'updated' : 'exists', prevQty: existing.qty };
     }
     const known = view.history.find((x) => x.key === key);
     const item = {
@@ -513,14 +617,152 @@
     dispatch({ type: 'addItem', listId: list.id, item });
     flashId = item.id;
     render();
-    return item.id;
+    return { id: item.id, status: 'added' };
   }
 
-  function addMany(text) {
-    const lines = text.split(/\r?\n|,(?=\s*\S)/).map((s) => s.trim()).filter(Boolean);
-    let n = 0;
-    for (const line of lines) if (addByName(line, { quiet: true })) n += 1;
-    toast(`Added ${n} item${n === 1 ? '' : 's'}`);
+  // Add several entries at once (a pasted text, "milk, eggs, bread", a voice note) with one Undo.
+  function addMany(entries) {
+    const list = currentList();
+    if (!list || !entries.length) return 0;
+    const results = entries.map((e) => addByName(e, { quiet: true })).filter(Boolean);
+    summarizeAdds(list, results);
+    return results.length;
+  }
+
+  function summarizeAdds(list, results, how = '') {
+    const added = results.filter((r) => r.status === 'added').length;
+    const back = results.filter((r) => r.status === 'restored').length;
+    const already = results.filter((r) => r.status === 'exists' || r.status === 'updated').length;
+    const bits = [];
+    if (added) bits.push(`Added ${added} item${added === 1 ? '' : 's'}${how}`);
+    if (back) bits.push(`${back} back on the list`);
+    if (already) bits.push(`${already} already there`);
+    const changed = results.filter((r) => r.status !== 'exists');
+    if (!changed.length) { toast(bits.join(', ') || 'Nothing to add'); return; }
+    toast(bits.join(', '), 'Undo', () => {
+      for (const r of changed) {
+        if (r.status === 'added') dispatch({ type: 'deleteItem', listId: list.id, itemId: r.id });
+        else if (r.status === 'restored') dispatch({ type: 'updateItem', listId: list.id, itemId: r.id, patch: { checked: true, qty: r.prevQty || '' } });
+        else dispatch({ type: 'updateItem', listId: list.id, itemId: r.id, patch: { qty: r.prevQty || '' } });
+      }
+    });
+  }
+
+  // One entry point for the add box: a single item, or several when the text holds a list.
+  function addText(text, opts) {
+    const entries = splitList(text, opts);
+    if (entries.length > 1) return addMany(entries);
+    if (entries.length === 1) return addByName(entries[0]) ? 1 : 0;
+    return addByName(text) ? 1 : 0;
+  }
+
+  /* ======================================================== paste a list */
+
+  function openBulk(prefill = '') {
+    const ta = $('#bulkText');
+    ta.value = prefill;
+    renderBulkPreview();
+    openSheet(els.bulkSheet);
+    if (!prefill) ta.focus();
+  }
+
+  function renderBulkPreview() {
+    const entries = splitList($('#bulkText').value);
+    const list = currentList();
+    const onList = new Set(list ? list.items.filter((i) => !i.checked).map((i) => keyOf(i.name)) : []);
+    const preview = $('#bulkPreview');
+    preview.replaceChildren(...entries.map((e, i) => {
+      const { name, qty } = parseEntry(e);
+      const known = view && view.history.find((x) => x.key === keyOf(name));
+      const c = catOf((known && known.category) || guessCategory(name));
+      const dup = onList.has(keyOf(name));
+      return h('li', { class: 'bulk-row', cat: c.color },
+        h('label', {},
+          h('input', { type: 'checkbox', 'data-i': String(i), checked: !dup }),
+          h('span', { class: 'bulk-name', text: name }),
+          qty ? h('span', { class: 'qty', text: qty }) : null,
+          h('span', { class: 'bulk-meta', text: dup ? 'Already on list' : c.label })));
+    }));
+    preview.hidden = !entries.length;
+    bulkEntries = entries;
+    updateBulkCount();
+  }
+  let bulkEntries = [];
+
+  function updateBulkCount() {
+    const n = $('#bulkPreview').querySelectorAll('input:checked').length;
+    const btn = $('#bulkAdd');
+    btn.textContent = n ? `Add ${n} item${n === 1 ? '' : 's'}` : 'Add items';
+    btn.disabled = !n;
+    $('#bulkHint').textContent = bulkEntries.length
+      ? 'Untick anything you don’t want. Tap Add when it looks right.'
+      : 'Paste a text message or type one item per line. Commas work too.';
+  }
+
+  /* =============================================================== voice */
+
+  const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let recog = null;
+
+  // Say items with a short pause between them: "milk … two pounds of chicken … eggs and bread".
+  function toggleVoice() {
+    if (recog) { recog.stop(); return; }
+    const list = currentList();
+    if (!SpeechRec || !list) return;
+    const results = [];
+    let failed = '';
+    recog = new SpeechRec();
+    recog.lang = navigator.language || 'en-US';
+    recog.continuous = true;
+    recog.interimResults = true;
+    recog.onresult = (e) => {
+      let interim = '';
+      for (let i = e.resultIndex; i < e.results.length; i += 1) {
+        const r = e.results[i];
+        if (r.isFinal) {
+          for (const entry of splitList(r[0].transcript, { voice: true })) {
+            const res = addByName(entry, { quiet: true });
+            if (res) results.push(res);
+          }
+        } else {
+          interim += r[0].transcript;
+        }
+      }
+      els.addInput.value = interim;
+    };
+    recog.onerror = (e) => {
+      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') failed = 'Microphone access is blocked. Allow it in the browser’s site settings.';
+      else if (e.error === 'no-speech') failed = 'Didn’t hear anything. Tap the mic and try again.';
+      else if (e.error === 'network') failed = 'Voice input needs an internet connection.';
+      else if (e.error !== 'aborted') failed = 'Voice input stopped. Try again.';
+    };
+    recog.onend = () => {
+      recog = null;
+      els.micBtn.setAttribute('aria-pressed', 'false');
+      els.addInput.value = '';
+      els.addInput.placeholder = els.addInput.dataset.placeholder;
+      if (results.length) summarizeAdds(list, results, ' by voice');
+      else if (failed) toast(failed);
+    };
+    try {
+      recog.start();
+    } catch {
+      recog = null;
+      toast('Voice input isn’t available right now');
+      return;
+    }
+    hideSuggestions();
+    els.micBtn.setAttribute('aria-pressed', 'true');
+    els.addInput.placeholder = 'Listening… pause between items';
+  }
+
+  // Shared from another app (Android: Share → Shopping list), or opened with ?text=…
+  function takeSharedText() {
+    const params = new URLSearchParams(location.search);
+    const text = [params.get('title'), params.get('text'), params.get('url')].filter(Boolean).join('\n').trim();
+    if (!params.has('text') && !params.has('title')) return;
+    history.replaceState(null, '', location.pathname);
+    if (text) openBulk(text);
   }
 
   /* ========================================================= suggestions */
@@ -557,12 +799,16 @@
       label = null;
     }
     suggIndex = -1;
-    if (!suggItems.length || document.activeElement !== els.addInput) {
+    if (document.activeElement !== els.addInput || recog || (!suggItems.length && q)) {
       hideSuggestions();
       return;
     }
     const kids = [];
-    if (label) kids.push(h('li', { class: 'sugg-label', role: 'presentation', text: label }));
+    if (!q) {
+      kids.push(h('li', { class: 'sugg-actions', role: 'presentation' },
+        h('button', { class: 'chip-btn', type: 'button', tabindex: '-1', 'data-bulk': '' }, 'Paste or type a whole list')));
+    }
+    if (label && suggItems.length) kids.push(h('li', { class: 'sugg-label', role: 'presentation', text: label }));
     suggItems.forEach((x, i) => {
       const c = catOf(x.category);
       kids.push(h('li', { class: 'sugg', role: 'option', id: `sugg-${i}`, 'aria-selected': 'false', cat: c.color },
@@ -722,6 +968,7 @@
     if (!list) return;
     closeSheet(els.menuSheet);
     switch (cmd) {
+      case 'bulk': return openBulk();
       case 'share': return shareList(list);
       case 'wake': return toggleWake();
       case 'uncheck':
@@ -845,7 +1092,7 @@
       if (suggIndex >= 0) return pickSuggestion(suggIndex);
       const v = els.addInput.value;
       if (!v.trim()) return undefined;
-      addByName(v);
+      addText(v);
       els.addInput.value = '';
       updateSuggestions();
       els.addInput.focus();
@@ -864,15 +1111,19 @@
     });
     els.addInput.addEventListener('paste', (e) => {
       const text = (e.clipboardData || window.clipboardData).getData('text');
-      if (/\n/.test(text.trim())) {
+      // Anything that looks like a list goes in straight away (one Undo takes it all back).
+      // A single item pastes into the box as usual so it can be edited first.
+      const entries = splitList(text);
+      if (entries.length > 1) {
         e.preventDefault();
-        addMany(text);
+        addMany(entries);
         els.addInput.value = '';
         updateSuggestions();
       }
     });
     els.suggestions.addEventListener('pointerdown', (e) => e.preventDefault()); // keep the keyboard open
     els.suggestions.addEventListener('click', (e) => {
+      if (e.target.closest('[data-bulk]')) { els.addInput.blur(); openBulk(); return; }
       const pick = e.target.closest('[data-pick]');
       const forget = e.target.closest('[data-forget]');
       if (pick) pickSuggestion(Number(pick.dataset.pick));
@@ -881,6 +1132,34 @@
         if (x) dispatch({ type: 'forget', key: x.key });
         updateSuggestions();
       }
+    });
+
+    // Voice
+    els.addInput.dataset.placeholder = els.addInput.placeholder;
+    els.micBtn.hidden = !SpeechRec;
+    els.micBtn.addEventListener('click', toggleVoice);
+
+    // Paste-a-list sheet
+    $('#bulkText').addEventListener('input', renderBulkPreview);
+    $('#bulkPreview').addEventListener('change', updateBulkCount);
+    $('#bulkPaste').hidden = !(navigator.clipboard && navigator.clipboard.readText);
+    $('#bulkPaste').addEventListener('click', async () => {
+      try {
+        const text = await navigator.clipboard.readText();
+        if (!text.trim()) return toast('The clipboard is empty');
+        const ta = $('#bulkText');
+        ta.value = ta.value.trim() ? `${ta.value.trim()}\n${text}` : text;
+        renderBulkPreview();
+      } catch {
+        toast('Long-press the box and choose Paste');
+      }
+      return undefined;
+    });
+    $('#bulkForm').addEventListener('submit', (e) => {
+      if (!e.submitter || e.submitter.value !== 'add') return;
+      const picked = [...$('#bulkPreview').querySelectorAll('input:checked')].map((b) => bulkEntries[Number(b.dataset.i)]);
+      addMany(picked.filter(Boolean));
+      $('#bulkText').value = '';
     });
 
     // Sheets: close buttons and backdrop taps
@@ -1009,6 +1288,7 @@
     if (ok) {
       showApp();
       connectEvents();
+      takeSharedText();
     } else if (!server) {
       els.boot.textContent = 'Can’t reach the server. Check that it’s running, then reload this page.';
       return undefined;
@@ -1023,7 +1303,7 @@
     for (const id of ['app', 'boot', 'login', 'main', 'toGet', 'empty', 'cart', 'cartToggle', 'cartTitle', 'cartClear',
       'cartItems', 'strip', 'progressText', 'listName', 'listSwitch', 'menuBtn', 'offline', 'addForm', 'addInput',
       'suggestions', 'itemSheet', 'listsSheet', 'listsList', 'menuSheet', 'askSheet', 'toast', 'toastText',
-      'toastAction', 'wakeBtn', 'logoutBtn']) {
+      'toastAction', 'wakeBtn', 'logoutBtn', 'bulkSheet', 'micBtn']) {
       els[id] = document.getElementById(id);
     }
     els.sync = document.getElementById('syncState');
@@ -1039,5 +1319,5 @@
   });
 
   // Exposed for quick checks in the browser console.
-  window.__shoppingList = { parseEntry, guessCategory };
+  window.__shoppingList = { parseEntry, guessCategory, splitList };
 })();

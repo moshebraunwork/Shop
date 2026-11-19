@@ -68,8 +68,11 @@
       <div class="add-row">
         <label for="addInput" class="sr-only">Add an item</label>
         <input id="addInput" type="text" enterkeyhint="done" maxlength="160"
-               placeholder="Add an item, like “2 avocados”"
+               placeholder="Add milk, eggs, bread…"
                role="combobox" aria-autocomplete="list" aria-controls="suggestions" aria-expanded="false">
+        <button id="micBtn" class="mic-btn" type="button" aria-label="Add items by voice" aria-pressed="false" hidden>
+          <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+        </button>
         <button class="add-btn" type="submit" aria-label="Add item">
           <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>
         </button>
@@ -114,6 +117,24 @@
     </form>
   </dialog>
 
+  <!-- Paste a list -->
+  <dialog id="bulkSheet" class="sheet" aria-labelledby="bulkTitle">
+    <form id="bulkForm" method="dialog">
+      <h2 id="bulkTitle" class="sheet-title">Paste a list</h2>
+      <label class="field">
+        <span id="bulkHint">Paste a text message or type one item per line. Commas work too.</span>
+        <textarea id="bulkText" rows="6" placeholder="Hey, can you grab:&#10;milk&#10;2 dozen eggs&#10;bread, butter and jam"></textarea>
+      </label>
+      <ul id="bulkPreview" class="bulk-preview" aria-label="Items that will be added" hidden></ul>
+      <div class="sheet-actions">
+        <button id="bulkPaste" type="button" class="btn" hidden>Paste</button>
+        <span class="spacer"></span>
+        <button type="button" class="btn" data-close>Cancel</button>
+        <button id="bulkAdd" type="submit" class="btn btn-primary" value="add" disabled>Add items</button>
+      </div>
+    </form>
+  </dialog>
+
   <!-- Lists -->
   <dialog id="listsSheet" class="sheet" aria-labelledby="listsTitle">
     <h2 id="listsTitle" class="sheet-title">Your lists</h2>
@@ -129,6 +150,7 @@
   <dialog id="menuSheet" class="sheet" aria-labelledby="menuTitle">
     <h2 id="menuTitle" class="sheet-title">Groceries</h2>
     <div class="menu">
+      <button type="button" class="menu-item" data-cmd="bulk">Paste a list from a text</button>
       <button type="button" class="menu-item" data-cmd="share">Share or copy this list</button>
       <button type="button" class="menu-item" data-cmd="wake" id="wakeBtn" hidden>Keep screen on while shopping</button>
       <button type="button" class="menu-item" data-cmd="uncheck">Put everything back on the list</button>

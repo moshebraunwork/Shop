@@ -340,6 +340,55 @@ button { cursor: pointer; background: none; border: 0; padding: 0; }
   font-size: 1.2rem;
 }
 
+.mic-btn {
+  flex: none;
+  width: 54px; height: 54px;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--sunk);
+  color: var(--ink);
+}
+.mic-btn[aria-pressed="true"] {
+  background: var(--danger);
+  color: #fff;
+  animation: listen 1.2s ease-in-out infinite;
+}
+@keyframes listen { 50% { box-shadow: 0 0 0 8px color-mix(in srgb, var(--danger) 25%, transparent); } }
+
+.sugg-actions { padding: 2px 0 6px; }
+.chip-btn {
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: 20px;
+  border: 2px dashed var(--line);
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+.chip-btn:hover { background: var(--sunk); }
+
+.bulk-preview {
+  list-style: none;
+  margin: -4px 0 12px;
+  padding: 0;
+  max-height: 40dvh;
+  overflow-y: auto;
+  border-radius: 12px;
+  background: var(--paper);
+}
+.bulk-row { border-left: 5px solid var(--cat, var(--line)); }
+.bulk-row + .bulk-row { border-top: 1px solid var(--line); }
+.bulk-row label {
+  display: flex; align-items: center; gap: 10px;
+  min-height: 46px;
+  padding: 4px 12px;
+  cursor: pointer;
+}
+.bulk-row input { width: 20px; height: 20px; flex: none; accent-color: var(--ink); }
+.bulk-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.bulk-row input:not(:checked) ~ .bulk-name { color: var(--muted); text-decoration: line-through; }
+.bulk-meta { flex: none; font-size: 0.82rem; color: var(--muted); }
+.btn:disabled { opacity: 0.45; }
+
 /* -------------------------------------------------------------- sheets */
 
 .sheet {
