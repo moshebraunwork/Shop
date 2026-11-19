@@ -26,11 +26,12 @@ A self-hosted, shared shopping list. One small Node server, no dependencies, dat
 **Docker (recommended)**
 
 ```bash
-# edit APP_PASSWORD in docker-compose.yml first
+cp .env.example .env
+nano .env                # set APP_PASSWORD (and port, name, proxy settings if you like)
 docker compose up -d --build
 ```
 
-Open `http://SERVER-IP:3000`.
+Open `http://SERVER-IP:3000`. Your settings live in `.env`, which git ignores, so updates never overwrite them.
 
 **Plain Node 18+**
 
@@ -55,8 +56,10 @@ On the server, from the folder you cloned:
 ```
 
 It pulls the latest version from GitHub, rebuilds the container and waits until it's healthy.
-Your list is in a Docker volume and isn't touched. Edits you made on the server (port, password
-in `docker-compose.yml`) are kept. `FORCE=1 ./update.sh` rebuilds even when there's nothing new.
+Your list is in a Docker volume and isn't touched, and your `.env` settings are kept. It won't start
+while the password is still `change-me`. If a container with the same name was started by hand with
+`docker run`, it's replaced by the compose one (same volume, so same list).
+`FORCE=1 ./update.sh` rebuilds even when there's nothing new.
 
 ## HTTPS (needed for install + offline)
 
@@ -68,7 +71,7 @@ list.yourdomain.com {
 }
 ```
 
-Then set `TRUST_PROXY: "1"`. With nginx, also add `proxy_buffering off;` so live sync isn't delayed.
+Then set `TRUST_PROXY=1` in `.env`. With nginx, also add `proxy_buffering off;` so live sync isn't delayed.
 Serving from a subpath (e.g. `/shopping/`) works if the proxy strips the prefix.
 
 ## Oracle Cloud note
@@ -82,11 +85,11 @@ sudo netfilter-persistent save
 
 ## Backups
 
-Everything lives in `db.json` in the data folder (Docker volume `shopping-data`).
+Everything lives in `db.json` in the data folder (the Docker volume named by `DATA_VOLUME`, default `shopping-list-data`).
 A copy is saved as `db.json.bak` each time the server starts. Writes are atomic, so a crash can't leave a half-written file.
 
 ```bash
-docker cp shopping-list:/data/db.json ./shopping-backup.json
+docker cp "$(docker compose ps -q)":/data/db.json ./shopping-backup.json
 ```
 
 ## API

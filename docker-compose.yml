@@ -1,17 +1,24 @@
+# Settings come from a .env file next to this one (copy .env.example to .env).
+# Without .env it runs as "shopping-list" on port 3000 with the password below.
 services:
   shopping-list:
     build: .
-    container_name: shopping-list
+    image: ${IMAGE_NAME:-shopping-list}
+    container_name: ${CONTAINER_NAME:-shopping-list}
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      # e.g. PORT_BINDING=127.0.0.1:3100 to only listen locally behind Caddy/nginx
+      - "${PORT_BINDING:-3000}:3000"
     environment:
       # Set a password before exposing this to the internet.
-      APP_PASSWORD: "change-me"
-      # Uncomment when running behind Caddy/nginx/Cloudflare Tunnel:
-      # TRUST_PROXY: "1"
+      APP_PASSWORD: ${APP_PASSWORD:-change-me}
+      # Set to 1 when running behind Caddy/nginx/Cloudflare Tunnel.
+      TRUST_PROXY: ${TRUST_PROXY:-0}
+      COOKIE_SECURE: ${COOKIE_SECURE:-0}
     volumes:
       - shopping-data:/data
 
 volumes:
   shopping-data:
+    # Your list lives here. Keep the same name across updates.
+    name: ${DATA_VOLUME:-shopping-list-data}
