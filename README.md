@@ -12,7 +12,7 @@ A self-hosted, shared shopping list. One small Node server, no dependencies, dat
   Greetings, "can you grab…", bullets, numbering, emoji, WhatsApp timestamps and headings like `Costco:` are skipped
 - "Paste a list from a text" in the ⋯ menu shows what will be added so you can untick things first
 - Voice: tap the mic and say items with a short pause between them (Chrome, Edge, Safari)
-- Share a text to the app from Android's share menu once it's installed, or open `/?text=milk%0Aeggs`
+- Share a text to the app from Android's share menu (install it with Chrome's Install app first): it lands in the add box, tap send. Or open `/?text=milk%0Aeggs`
 - Checked items move to a hidden "Completed" section; tap it to see them and clear them
 - Shopping mode (the Shop button): black and white like an always-on display, big clock,
   screen stays on, tap anywhere on a row to check it off. Stays on until you tap "Done"

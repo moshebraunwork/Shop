@@ -766,7 +766,13 @@
     const text = [params.get('title'), params.get('text'), params.get('url')].filter(Boolean).join('\n').trim();
     if (!params.has('text') && !params.has('title')) return;
     history.replaceState(null, '', location.pathname);
-    if (text) openBulk(text);
+    if (!text) return;
+    // Shared text lands in the add box so you can check it, then tap send.
+    if (shopping) exitShopping();
+    els.addInput.value = els.addInput.value.trim() ? `${els.addInput.value.trim()}\n${text}` : text;
+    sizeAddBox();
+    els.addInput.focus();
+    els.addInput.setSelectionRange(els.addInput.value.length, els.addInput.value.length);
   }
 
   /* ============================================================ add box */
